@@ -7,7 +7,7 @@ namespace LeadAnalytics.Api.Models;
 public class Lead
 {
     [JsonPropertyName("id")]
-    public Guid Id { get; set; }
+    public string Id { get; set; }
     [JsonPropertyName("id")]
     public string ExternalId { get; set; }
 
@@ -31,6 +31,7 @@ public class Lead
 
     [JsonPropertyName("gender")]
     public string? Gender { get; set; }
+    public string Origin { get; set; }
 
     [JsonPropertyName("observations")]
     public string? Observations { get; set; }
