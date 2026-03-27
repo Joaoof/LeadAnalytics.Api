@@ -1,37 +1,64 @@
-﻿namespace LeadAnalytics.Api.Models;
+﻿using LeadAnalytics.Api.DTOs;
+using System.Text.Json.Serialization;
 
-public class Lead
+namespace LeadAnalytics.Api.Models;
+
+public class LeadWebhookDto
 {
-    public Guid Id { get; set; }
-    public string ExternalId { get; set; } = null!;
-    public string TenantId { get; set; } = null!;
+    [JsonPropertyName("id")]
+    public long Id { get; set; }
 
+    [JsonPropertyName("clinic_id")]
+    public int ClinicId { get; set; }
+
+    [JsonPropertyName("name")]
     public string Name { get; set; } = null!;
+
+    [JsonPropertyName("phone")]
     public string Phone { get; set; } = null!;
+
+    [JsonPropertyName("email")]
     public string? Email { get; set; }
+
+    [JsonPropertyName("cpf")]
     public string? Cpf { get; set; }
+
+    [JsonPropertyName("idfacebookapp")]
     public string? IdFacebookApp { get; set; }
+
+    [JsonPropertyName("gender")]
     public string? Gender { get; set; }
 
-    public string? Origin { get; set; }
-    public string? AdData { get; set; }
-
-    public string? Stage { get; set; }
-    public int? IdStage { get; set; } // 🔥 novo
-
-    public string Status { get; set; } = "new";
-    public bool HasAppointment { get; set; } = false;
-
-    public decimal? Value { get; set; } // 🔥 novo
-
-    public string? Tags { get; set; }
+    [JsonPropertyName("observations")]
     public string? Observations { get; set; }
 
-    public string? ConversationState { get; set; } // 🔥 novo
-    public string? CustomFields { get; set; } // 🔥 novo
-    public string? LastAdId { get; set; } // 🔥 novo
+    [JsonPropertyName("ad_data")]
+    public List<object>? AdData { get; set; }
 
+    [JsonPropertyName("last_ad_id")]
+    public string? LastAdId { get; set; }
+
+    [JsonPropertyName("stage")]
+    public string? Stage { get; set; }
+
+    [JsonPropertyName("id_stage")]
+    public int? IdStage { get; set; }
+
+    [JsonPropertyName("value")]
+    public decimal? Value { get; set; }
+
+    [JsonPropertyName("tags")]
+    public List<TagDto>? Tags { get; set; }
+
+    [JsonPropertyName("conversationState")]
+    public string? ConversationState { get; set; }
+
+    [JsonPropertyName("customFields")]
+    public List<object>? CustomFields { get; set; }
+
+    [JsonPropertyName("created_at")]
     public DateTime CreatedAt { get; set; }
+
+    [JsonPropertyName("last_updated_at")]
     public DateTime UpdatedAt { get; set; }
-    public DateTime? ConvertedAt { get; set; }
 }
