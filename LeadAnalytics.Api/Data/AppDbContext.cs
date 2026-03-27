@@ -18,7 +18,7 @@ public class AppDbContext : DbContext
             entity.HasKey(e => e.Id);
 
             // Não pode ter dois leads com o mesmo ExternalId + TenantId
-            entity.HasIndex(e => new { e.ExternalId, e.TenantId })
+            entity.HasIndex(e => new { e.Id, e.TenantId })
                   .IsUnique();
 
             // Índice pra busca rápida por clínica e data

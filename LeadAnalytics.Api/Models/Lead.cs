@@ -1,15 +1,18 @@
 ﻿using LeadAnalytics.Api.DTOs;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Text.Json.Serialization;
 
 namespace LeadAnalytics.Api.Models;
 
-public class LeadWebhookDto
+public class Lead
 {
     [JsonPropertyName("id")]
-    public long Id { get; set; }
+    public Guid Id { get; set; }
+    [JsonPropertyName("id")]
+    public string ExternalId { get; set; }
 
     [JsonPropertyName("clinic_id")]
-    public int ClinicId { get; set; }
+    public string TenantId { get; set; }
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = null!;
@@ -33,6 +36,7 @@ public class LeadWebhookDto
     public string? Observations { get; set; }
 
     [JsonPropertyName("ad_data")]
+    [NotMapped]
     public List<object>? AdData { get; set; }
 
     [JsonPropertyName("last_ad_id")]
@@ -54,6 +58,7 @@ public class LeadWebhookDto
     public string? ConversationState { get; set; }
 
     [JsonPropertyName("customFields")]
+    [NotMapped]
     public List<object>? CustomFields { get; set; }
 
     [JsonPropertyName("created_at")]
