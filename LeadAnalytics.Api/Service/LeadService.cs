@@ -3,7 +3,6 @@ using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
 using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
-using System.Security.AccessControl;
 
 namespace LeadAnalytics.Api.Service;
 
