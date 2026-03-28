@@ -77,19 +77,30 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
         var lead = await _db.Leads.FirstOrDefaultAsync(l => l.ExternalId == externalId &&
             l.TenantId == tenantId);
 
-        // Existe — atualiza só os campos que vieram preenchidos
-        if (dto.Name is not null) lead.Name = dto.Name;
-        if (dto.Phone is not null) lead.Phone = dto.Phone;
-        if (dto.Email is not null) lead.Email = dto.Email;
-        if (dto.Stage is not null) lead.Stage = dto.Stage;
-        if (dto.Observations is not null) lead.Observations = dto.Observations;
-
-        if (dto.Stage == "10_EM_TRATAMENTO")
+        if (lead is null)
         {
-            lead.HasAppointment = true;
+            _logger.LogWarning("Lead não encontrado para atualizar: {Id}", externalId);
+            return ProcessResult.Ignored;
         }
 
-        lead.UpdatedAt = DateTime.UtcNow;
+        // Existe — atualiza só os campos que vieram preenchidos
+        if (dto.Name is not null) lead?.Name = dto.Name;
+        if (dto.Phone is not null) lead?.Phone = dto.Phone;
+        if (dto.Email is not null) lead?.Email = dto.Email;
+        if (dto.Stage is not null) lead?.Stage = dto.Stage;
+        if (dto.Observations is not null) lead?.Observations = dto.Observations;
+
+        if (dto.Stage == "10_EM_TRATAMENTO" | dto.Stage == "09_FECHOU_TRATAMENTO")
+        {
+            lead?.HasAppointment = true;
+        }
+
+        if (dto.Stage == "03_LEAD_QUENTE_QUALIFICADO")
+        {
+            lead?.HasAppointment = false;
+        }
+
+        lead?.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
