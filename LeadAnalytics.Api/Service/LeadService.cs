@@ -84,6 +84,11 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
         if (dto.Stage is not null) lead.Stage = dto.Stage;
         if (dto.Observations is not null) lead.Observations = dto.Observations;
 
+        if (dto.Stage == "10_EM_TRATAMENTO")
+        {
+            lead.HasAppointment = true;
+        }
+
         lead.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
