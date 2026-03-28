@@ -3,6 +3,7 @@ using System;
 using LeadAnalytics.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LeadAnalytics.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260328143400_AddTableInit")]
+    partial class AddTableInit
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -99,15 +102,10 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("UnitId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("UnitId");
 
                     b.HasIndex("Id", "TenantId")
                         .IsUnique();
@@ -115,48 +113,6 @@ namespace LeadAnalytics.Api.Migrations
                     b.HasIndex("TenantId", "CreatedAt");
 
                     b.ToTable("leads", (string)null);
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.Unit", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClinicId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicId", "CreatedAt");
-
-                    b.HasIndex("Id", "ClinicId")
-                        .IsUnique();
-
-                    b.ToTable("units", (string)null);
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
-                {
-                    b.HasOne("LeadAnalytics.Api.Models.Unit", "Unit")
-                        .WithMany("Leads")
-                        .HasForeignKey("UnitId");
-
-                    b.Navigation("Unit");
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.Unit", b =>
-                {
-                    b.Navigation("Leads");
                 });
 #pragma warning restore 612, 618
         }

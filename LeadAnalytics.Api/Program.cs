@@ -1,5 +1,6 @@
 using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.Service;
+using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +18,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddScoped<LeadService>();
+builder.Services.AddScoped<UnitService>();
 
 var app = builder.Build();
    

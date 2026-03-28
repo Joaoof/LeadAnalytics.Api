@@ -35,4 +35,8 @@ public class Lead
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? ConvertedAt { get; set; }
+
+    // Relacionamento com a unidade
+    public int? UnitId { get; set; }
+    public Unit? Unit { get; set; }
 }

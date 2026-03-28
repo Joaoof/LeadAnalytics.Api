@@ -8,6 +8,7 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) {}
 
     public DbSet<Lead> Leads { get; set; }
+    public DbSet<Unit> Units { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +24,23 @@ public class AppDbContext : DbContext
 
             // Índice pra busca rápida por clínica e data
             entity.HasIndex(e => new { e.TenantId, e.CreatedAt });
+
+            // Relacionamento Lead → Unit
+            modelBuilder.Entity<Lead>()
+                .HasOne(l => l.Unit)
+                .WithMany(u => u.Leads)
+                .HasForeignKey(l => l.UnitId);
+        });
+
+        modelBuilder.Entity<Unit>(entity =>
+        {
+            entity.ToTable("units");
+
+            entity.HasKey(e => e.Id);
+
+            entity.HasIndex(e => new { e.Id, e.ClinicId }).IsUnique();
+
+            entity.HasIndex(e => new { e.ClinicId, e.CreatedAt });
         });
     }
 }

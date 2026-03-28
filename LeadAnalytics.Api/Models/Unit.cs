@@ -6,4 +6,6 @@ public class Unit
     public int ClinicId { get; set; }
     public string Name { get; set; }
     public DateTime CreatedAt { get; set; }
+    public List<Lead> Leads { get; set; } = [];
+
 }
