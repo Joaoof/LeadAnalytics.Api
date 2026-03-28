@@ -22,10 +22,14 @@ public class UnitService
 
         if (unit is null)
         {
+            var name = clinicId == 8020
+                ? $"Unidade de Araguaína {clinicId}"
+                : $"Unidade {clinicId}";
+
             unit = new Unit
             {
                 ClinicId = clinicId,
-                Name = $"Unidade {clinicId}",
+                Name = name,
                 CreatedAt = DateTime.UtcNow
             };
 
