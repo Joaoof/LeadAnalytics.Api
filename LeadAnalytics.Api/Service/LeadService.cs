@@ -12,8 +12,20 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
 
     public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
     {
-        var externalId = dto.Data.Id.ToString();
-        var tenantId = dto.Data.ClinicId.ToString();
+        
+        return dto.Type switch
+        {
+            "CUSTOMER_CREATED" => await CriarLead(dto.Data),
+            "CUSTOMER_UPDATED" => await AtualizarLead(dto.Data),
+            _ => ProcessResult.Ignored
+        };
+    }
+
+
+    private async Task<ProcessResult> CriarLead(CloudiaLeadDataDto dto)
+    {
+        var externalId = dto.Id;
+        var tenantId = dto.ClinicId;
 
         // 1. Esse lead já existe no banco?
         var searchLead = await _db.Leads
@@ -34,14 +46,14 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
         // 3. Não existe — cria
         var newLead = new Lead
         {
-            Id = dto.Data.Id,
+            Id = dto.Id,
             ExternalId = externalId,
             TenantId = tenantId,
-            Name = dto.Data.Name ?? "Sem nome",
-            Phone = dto.Data.Phone ?? "Sem telefone",
-            Email = dto.Data.Email,
-            Origin = dto.Data.Origin ?? "Sem origem",
-            Stage = dto.Data.Stage,
+            Name = dto.Name ?? "Sem nome",
+            Phone = dto.Phone ?? "Sem telefone",
+            Email = dto.Email,
+            Origin = dto.Origin ?? "Sem origem",
+            Stage = dto.Stage,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -53,7 +65,31 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
         {
             _logger.LogInformation("Lead criado: {Id}", externalId);
         }
+
         return ProcessResult.Created;
+    }
+
+    private async Task<ProcessResult> AtualizarLead(CloudiaLeadDataDto dto)
+    {
+        var externalId = dto.Id;
+        var tenantId = dto.ClinicId;
+
+        var lead = await _db.Leads.FirstOrDefaultAsync(l => l.ExternalId == externalId &&
+            l.TenantId == tenantId);
+
+        // Existe — atualiza só os campos que vieram preenchidos
+        if (dto.Name is not null) lead.Name = dto.Name;
+        if (dto.Phone is not null) lead.Phone = dto.Phone;
+        if (dto.Email is not null) lead.Email = dto.Email;
+        if (dto.Stage is not null) lead.Stage = dto.Stage;
+        if (dto.Observations is not null) lead.Observations = dto.Observations;
+
+        lead.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Lead atualizado: {Id}", externalId);
+        return ProcessResult.Updated;
     }
 }
 

@@ -22,106 +22,85 @@ namespace LeadAnalytics.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("LeadAnalytics.Api.DTOs.TagDto", b =>
+            modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasJsonPropertyName("id");
+                        .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<Guid?>("LeadId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("name");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LeadId");
-
-                    b.ToTable("TagDto");
-
-                    b.HasAnnotation("Relational:JsonPropertyName", "tags");
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasJsonPropertyName("id");
+                    b.Property<string>("AdData")
+                        .HasColumnType("text");
 
                     b.Property<string>("ConversationState")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("conversationState");
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Cpf")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("cpf");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasJsonPropertyName("created_at");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Email")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("email");
+                        .HasColumnType("text");
 
-                    b.Property<string>("ExternalId")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("id");
+                    b.Property<int>("ExternalId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Gender")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("gender");
+                        .HasColumnType("text");
+
+                    b.Property<bool>("HasAppointment")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("HasHealthInsurancePlan")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("IdChannelIntegration")
+                        .HasColumnType("integer");
 
                     b.Property<string>("IdFacebookApp")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("idfacebookapp");
+                        .HasColumnType("text");
 
                     b.Property<int?>("IdStage")
-                        .HasColumnType("integer")
-                        .HasJsonPropertyName("id_stage");
+                        .HasColumnType("integer");
 
                     b.Property<string>("LastAdId")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("last_ad_id");
+                        .HasColumnType("text");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("name");
+                        .HasColumnType("text");
 
                     b.Property<string>("Observations")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("observations");
+                        .HasColumnType("text");
+
+                    b.Property<string>("Origin")
+                        .HasColumnType("text");
 
                     b.Property<string>("Phone")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("phone");
+                        .HasColumnType("text");
 
                     b.Property<string>("Stage")
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("stage");
+                        .HasColumnType("text");
 
-                    b.Property<string>("TenantId")
+                    b.Property<string>("Status")
                         .IsRequired()
-                        .HasColumnType("text")
-                        .HasJsonPropertyName("clinic_id");
+                        .HasColumnType("text");
+
+                    b.Property<string>("Tags")
+                        .HasColumnType("text");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasJsonPropertyName("last_updated_at");
-
-                    b.Property<decimal?>("Value")
-                        .HasColumnType("numeric")
-                        .HasJsonPropertyName("value");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 
@@ -131,18 +110,6 @@ namespace LeadAnalytics.Api.Migrations
                     b.HasIndex("TenantId", "CreatedAt");
 
                     b.ToTable("leads", (string)null);
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.DTOs.TagDto", b =>
-                {
-                    b.HasOne("LeadAnalytics.Api.Models.Lead", null)
-                        .WithMany("Tags")
-                        .HasForeignKey("LeadId");
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
-                {
-                    b.Navigation("Tags");
                 });
 #pragma warning restore 612, 618
         }

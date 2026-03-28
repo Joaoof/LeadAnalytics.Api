@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LeadAnalytics.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260327175233_Leads")]
-    partial class Leads
+    [Migration("20260328121940_TableInitialLeads")]
+    partial class TableInitialLeads
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,9 +27,11 @@ namespace LeadAnalytics.Api.Migrations
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("AdData")
                         .HasColumnType("text");
@@ -46,21 +48,23 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("CustomFields")
-                        .HasColumnType("text");
-
                     b.Property<string>("Email")
                         .HasColumnType("text");
 
-                    b.Property<string>("ExternalId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("ExternalId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Gender")
                         .HasColumnType("text");
 
                     b.Property<bool>("HasAppointment")
                         .HasColumnType("boolean");
+
+                    b.Property<bool?>("HasHealthInsurancePlan")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("IdChannelIntegration")
+                        .HasColumnType("integer");
 
                     b.Property<string>("IdFacebookApp")
                         .HasColumnType("text");
@@ -95,19 +99,15 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<string>("Tags")
                         .HasColumnType("text");
 
-                    b.Property<string>("TenantId")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal?>("Value")
-                        .HasColumnType("numeric");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("ExternalId", "TenantId")
+                    b.HasIndex("Id", "TenantId")
                         .IsUnique();
 
                     b.HasIndex("TenantId", "CreatedAt");
