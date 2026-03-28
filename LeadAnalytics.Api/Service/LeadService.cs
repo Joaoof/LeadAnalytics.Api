@@ -1,14 +1,17 @@
 ﻿using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
+using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Security.AccessControl;
 
 namespace LeadAnalytics.Api.Service;
 
-public class LeadService(AppDbContext db, ILogger<LeadService> logger)
+public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitService unitService)
 {
     private readonly AppDbContext _db = db;
     private readonly ILogger<LeadService> _logger = logger;
+    private readonly UnitService _unitService = unitService;
 
     public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
     {
@@ -33,6 +36,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
                 l.ExternalId == externalId &&
                 l.TenantId == tenantId);
 
+        var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
+
         // 2. Já existe — ignora
         if (searchLead is not null)
         {
@@ -54,6 +59,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger)
             Email = dto.Email,
             Origin = dto.Origin ?? "Sem origem",
             Stage = dto.Stage,
+            UnitId = unit.Id,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
