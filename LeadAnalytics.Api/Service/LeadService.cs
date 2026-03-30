@@ -124,6 +124,9 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         var externalId = dto.Data.Id;
         var tenantId = dto.Data.ClinicId;
 
+        _logger.LogInformation("Tags recebidas: {Tags}", JsonSerializer.Serialize(dto.Data.Tags));
+
+
         var lead = await _db.Leads.FirstOrDefaultAsync(l => l.ExternalId == externalId &&
         l.TenantId == tenantId);
 
