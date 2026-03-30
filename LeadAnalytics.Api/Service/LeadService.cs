@@ -3,6 +3,7 @@ using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
 using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace LeadAnalytics.Api.Service;
 
@@ -93,6 +94,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.Phone is not null) lead?.Phone = dto.Phone;
         if (dto.Email is not null) lead?.Email = dto.Email;
         if (dto.Stage is not null) lead?.Stage = dto.Stage;
+        if (dto.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Tags);
         if (dto.Observations is not null) lead?.Observations = dto.Observations;
 
         if (dto.Stage == "10_EM_TRATAMENTO" | dto.Stage == "09_FECHOU_TRATAMENTO")
@@ -112,6 +114,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         _logger.LogInformation("Lead atualizado: {Id}", externalId);
         return ProcessResult.Updated;
     }
+
+    public async Task<ProcessResult> PegarTagsLeads()
 }
 
 public enum ProcessResult { Created, Updated, Ignored }
