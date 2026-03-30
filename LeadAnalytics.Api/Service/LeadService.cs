@@ -60,6 +60,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             Email = dto.Email,
             Origin = dto.Origin ?? "Sem origem",
             Stage = dto.Stage,
+            Tags = dto.Tags,
             UnitId = unit.Id,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
