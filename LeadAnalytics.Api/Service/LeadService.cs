@@ -115,7 +115,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    public async Task<ProcessResult> PegarTagsLeads()
+    //public async Task<ProcessResult> PegarTagsLeads()
 }
 
 public enum ProcessResult { Created, Updated, Ignored }
