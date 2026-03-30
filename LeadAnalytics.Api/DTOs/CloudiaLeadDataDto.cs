@@ -58,7 +58,7 @@ public class CloudiaLeadDataDto
     public List<CloudiaAdDataDto>? AdData { get; set; }
 
     [JsonPropertyName("tags")]
-    public List<CloudiaTagDto>? Tags { get; set; }
+    public string Tags { get; set; }
 }
 
 // Dados do anúncio

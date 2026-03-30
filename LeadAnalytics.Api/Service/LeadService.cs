@@ -20,6 +20,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         {
             "CUSTOMER_CREATED" => await CriarLead(dto.Data),
             "CUSTOMER_UPDATED" => await AtualizarLead(dto.Data),
+            "CUSTOMER_TAGS_UPDATED" => await AtualizarTagUsuário(dto),
             _ => ProcessResult.Ignored
         };
     }
@@ -115,7 +116,28 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    //public async Task<ProcessResult> PegarTagsLeads()
+    public async Task<ProcessResult> AtualizarTagUsuário(CloudiaWebhookDto dto)
+    {
+        var externalId = dto.Data.Id;
+        var tenantId = dto.Data.ClinicId;
+
+        var lead = await _db.Leads.FirstOrDefaultAsync(l => l.ExternalId == externalId &&
+        l.TenantId == tenantId);
+
+        if (lead is null)
+        {
+            _logger.LogWarning("Lead não encontrado para atualizar: {Id}", externalId);
+            return ProcessResult.Ignored;
+        }
+
+        if (dto.Data.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Data.Tags);
+        lead?.UpdatedAt = DateTime.UtcNow;
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Lead atualizado: {Id}", externalId);
+        return ProcessResult.Updated;
+    }
 }
 
 public enum ProcessResult { Created, Updated, Ignored }
