@@ -44,7 +44,6 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         {
             if (_logger.IsEnabled(LogLevel.Information))
             {
-                _logger.LogInformation("Lead duplicado ignorado: {Id}", externalId);
             }
             return ProcessResult.Ignored;
         }
@@ -63,6 +62,9 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             Tags = dto.Tags is not null              // ← adiciona
                  ? JsonSerializer.Serialize(dto.Tags)
                  : null,
+            AdData = dto.AdData is not null
+                ? JsonSerializer.Serialize(dto.AdData)
+                : null,
             UnitId = unit.Id,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
@@ -99,6 +101,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.Email is not null) lead?.Email = dto.Email;
         if (dto.Stage is not null) lead?.Stage = dto.Stage;
         if (dto.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Tags);
+        if (dto.AdData is not null) lead?.AdData = JsonSerializer.Serialize(dto.AdData);
         if (dto.Observations is not null) lead?.Observations = dto.Observations;
 
         if (dto.Stage == "10_EM_TRATAMENTO" || dto.Stage == "09_FECHOU_TRATAMENTO")
@@ -123,7 +126,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     {
         var externalId = dto.Data.Id;
         var tenantId = dto.Data.ClinicId;
-
+            
         _logger.LogInformation("Tags recebidas: {Tags}", JsonSerializer.Serialize(dto.Data.Tags));
 
 
@@ -144,6 +147,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         _logger.LogInformation("Lead atualizado: {Id}", externalId);
         return ProcessResult.Updated;
     }
+
+    public async Task<ProcessResult> PegarTodosContatosTags()
 }
 
 public enum ProcessResult { Created, Updated, Ignored }
