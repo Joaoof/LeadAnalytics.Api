@@ -60,7 +60,9 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             Email = dto.Email,
             Origin = dto.Origin ?? "Sem origem",
             Stage = dto.Stage,
-            Tags = dto.Tags,
+            Tags = dto.Tags is not null              // ← adiciona
+                 ? JsonSerializer.Serialize(dto.Tags)
+                 : null,
             UnitId = unit.Id,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
