@@ -26,6 +26,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     }
 
 
+
+
     private async Task<ProcessResult> CriarLead(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
@@ -148,7 +150,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    public async Task<ProcessResult> PegarTodosContatosTags()
+    //public async Task<ProcessResult> PegarTodosContatosTags()
 }
 
 public enum ProcessResult { Created, Updated, Ignored }
