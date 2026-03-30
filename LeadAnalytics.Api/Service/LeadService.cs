@@ -101,7 +101,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Tags);
         if (dto.Observations is not null) lead?.Observations = dto.Observations;
 
-        if (dto.Stage == "10_EM_TRATAMENTO" | dto.Stage == "09_FECHOU_TRATAMENTO")
+        if (dto.Stage == "10_EM_TRATAMENTO" || dto.Stage == "09_FECHOU_TRATAMENTO")
         {
             lead?.HasAppointment = true;
         }
