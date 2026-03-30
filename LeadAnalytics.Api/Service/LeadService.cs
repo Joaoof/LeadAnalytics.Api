@@ -1,7 +1,7 @@
 ﻿using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
-using LeadAnalytics.Api.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -15,7 +15,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
     public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
     {
-        
+
         return dto.Type switch
         {
             "CUSTOMER_CREATED" => await CriarLead(dto.Data),
@@ -26,7 +26,12 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     }
 
 
+    public async Task<List<Lead>> TrazerTodosLeads()
+    {
+        var leads = await _db.Leads.ToListAsync();
 
+        return leads;
+    }
 
     private async Task<ProcessResult> CriarLead(CloudiaLeadDataDto dto)
     {
@@ -103,7 +108,53 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.Email is not null) lead?.Email = dto.Email;
         if (dto.Stage is not null) lead?.Stage = dto.Stage;
         if (dto.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Tags);
-        if (dto.AdData is not null) lead?.AdData = JsonSerializer.Serialize(dto.AdData);
+        if (dto.AdData is not null)
+        {
+            // salva JSON bruto
+            lead?.AdData = JsonSerializer.Serialize(dto.AdData);
+
+            var lista = dto.AdData
+                .Select(a => new AdDataDto
+                {
+                    Id = a.AdId ?? string.Empty,
+                    AdName = a.AdName ?? string.Empty,
+                    source = a.Source ?? string.Empty
+                })
+                .ToList();
+
+            if (dto.AdData is not null && dto.AdData.Count > 0)
+            {
+                var item = lista[0];
+
+                lead?.Campaign = string.IsNullOrEmpty(item.Id) ? "DESCONHECIDA" : item.Id;
+                lead?.Ad = string.IsNullOrEmpty(item.AdName) ? "DESCONHECIDO" : item.AdName;
+                lead?.SourceFinal = !string.IsNullOrEmpty(item.source) ? item.source : dto.Origin ?? "DESCONHECIDO";
+                lead?.TrackingConfidence = "ALTA";
+            }
+        }
+        else
+        {
+            // fallback
+            if (!string.IsNullOrEmpty(dto.Origin))
+            {
+                lead?.SourceFinal = dto.Origin;
+                lead?.TrackingConfidence = "MEDIA";
+            }
+            else
+            {
+                lead?.SourceFinal = "DESCONHECIDO";
+                lead?.TrackingConfidence = "BAIXA";
+            }
+
+            lead?.Campaign = "DESCONHECIDA";
+            lead?.Ad = "DESCONHECIDO";
+
+            if (dto.AdData is not null)
+            {
+                lead?.AdData = JsonSerializer.Serialize(dto.AdData);
+            }
+
+        }
         if (dto.Observations is not null) lead?.Observations = dto.Observations;
 
         if (dto.Stage == "10_EM_TRATAMENTO" || dto.Stage == "09_FECHOU_TRATAMENTO")
@@ -128,7 +179,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     {
         var externalId = dto.Data.Id;
         var tenantId = dto.Data.ClinicId;
-            
+
         _logger.LogInformation("Tags recebidas: {Tags}", JsonSerializer.Serialize(dto.Data.Tags));
 
 
@@ -150,7 +201,74 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    //public async Task<ProcessResult> PegarTodosContatosTags()
+    public async Task<ProblemDetails> VerificarConsultasFechadas(int clinicId)
+    {
+        var verificarLeads = await _db.Units
+            .Where(l => l.ClinicId == clinicId)
+            .Select(l => l.Leads.Select(l => l.Stage == "10_EM_TRATAMENTO" || l.Stage == "9_FECHOU_TRATAMENTO"))
+            .ToListAsync();
+
+        if (verificarLeads.Count == 0)
+        {
+            return new ProblemDetails
+            {
+                Status = 404,
+                Title = "Nenhuma consulta fechada" 
+            };
+        }
+
+        return new ProblemDetails
+        {
+            Status = 200,
+            Title = "Consultas encontradas",
+            Extensions = new Dictionary<string, object?> { ["count"] = verificarLeads.Count }
+        };
+    }
+
+    public async Task<ProblemDetails> VerificarEtapaSemPagamento(int clinicId)
+    {
+        var verificarPagamento = await _db.Units
+            .Where(l => l.ClinicId == clinicId)
+            .Select(l => l.Leads.Select(l => l.Stage == "04_AGENDADO_SEM_PAGAMENTO")).ToListAsync();
+
+        if (verificarPagamento.Count == 0)
+        {
+            return new ProblemDetails
+            {
+                Status = 404,
+                Title = "Nenhuma consulta agendada sem pagamento"
+            };
+        }
+
+        return new ProblemDetails
+        {
+            Status = 200,
+            Title = "Agendados sem pagamento",
+            Extensions = new Dictionary<string, object?> { ["quantidade"] = verificarPagamento.Count }
+        };
+    }
+
+    public async Task<int> VerificarEtapaComPagamento(int clinicId)
+    {
+        return await _db.Leads
+            .Where(l => l.UnitId == clinicId &&
+                        l.Stage == "05_AGENDADO_COM_PAGAMENTO")
+            .CountAsync();
+    }
+
+    //public async Task<List<CloudiaWebhookDto>> PegarAnunciosLeads(CloudiaWebhookDto dto, int clinicId)
+    //{
+    //    var leads = await _db.Leads.Where(l => l.Unit.ClinicId == clinicId && l.AdData != null).ToListAsync();
+
+    //    if(dto.Data.AdData)
+    //    {
+
+    //    }
+
+
+    //}
+
+    //public async Task<>
 }
 
 public enum ProcessResult { Created, Updated, Ignored }

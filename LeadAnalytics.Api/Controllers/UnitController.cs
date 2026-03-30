@@ -1,5 +1,6 @@
-﻿using LeadAnalytics.Api.Services;
+﻿using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.OpenApi;
 
 namespace LeadAnalytics.Api.Controllers;
 
@@ -37,5 +38,13 @@ public class UnitController(UnitService unitService) : ControllerBase
 
         unit.Name = name;
         return Ok(unit);
+    }
+    [HttpGet("quantity-leads")]
+    public async Task<IActionResult> GetQuantityLeadsUnit(int clinicId)
+    {
+        var units = await _unitService.GetQuantityLeadsUnit(clinicId);
+        if (units.Count == 0)
+            return NotFound();
+        return Ok(units);
     }
 }

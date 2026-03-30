@@ -19,6 +19,13 @@ public class WebhooksController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet]
+    public IActionResult GetAllLeads()
+    {
+        var leads = _leadService.TrazerTodosLeads().Result;
+        return Ok(leads);
+    }
+
     [HttpPost("cloudia")]
     public async Task<IActionResult> Cloudia([FromBody] CloudiaWebhookDto? dto)
     {
@@ -33,4 +40,38 @@ public class WebhooksController : ControllerBase
         return Ok(new { result = result.ToString() });
     }
 
+    [HttpGet("consultas")]
+    public async Task<IActionResult> GetHasAppoiment(int clinicId)
+    {
+        var result = await _leadService.VerificarConsultasFechadas(clinicId);
+        return await Task.FromResult<IActionResult>(Ok(result));
+    }
+
+    [HttpGet("sem-pagamento")]
+    public async Task<IActionResult> GetLeadsWithoutPayment(int clinicId)
+    {
+        var result = await _leadService.VerificarEtapaSemPagamento(clinicId);
+        return await Task.FromResult<IActionResult>(Ok(result));
+    }
+
+    [HttpGet("com-pagamento")]
+    public async Task<IActionResult> VerificarEtapaComPagamento(int clinicId)
+    {
+        var quantidade = await _leadService.VerificarEtapaComPagamento(clinicId);
+
+        if (quantidade == 0)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Nenhuma consulta agendada com pagamento",
+                Status = 404
+            });
+        }
+
+        return Ok(new
+        {
+            mensagem = "Agendados com pagamento",
+            quantidade
+        });
+    }
 }

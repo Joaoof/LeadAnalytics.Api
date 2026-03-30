@@ -83,3 +83,9 @@ public class CloudiaTagDto
     [JsonPropertyName("name")]
     public string? Name { get; set; }
 }
+
+public class CloudiaHasAppoimentDto
+{
+    [JsonPropertyName("has_appointment")]
+    public bool HasAppointment { get; set; }
+}

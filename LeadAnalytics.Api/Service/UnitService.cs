@@ -2,7 +2,7 @@
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace LeadAnalytics.Api.Services;
+namespace LeadAnalytics.Api.Service;
 
 public class UnitService
 {
@@ -48,5 +48,37 @@ public class UnitService
         return await _db.Units
             .OrderBy(u => u.Name)
             .ToListAsync();
+    }
+
+    public async Task<List<Unit>> GetQuantityLeadsUnit(int clinicId)
+    {
+        // Carrega unidades do clinicId
+        var units = await _db.Units
+            .Where(u => u.ClinicId == clinicId)
+            .ToListAsync();
+
+        if (units.Count == 0)
+            return units;
+
+        // Obtém os Ids das unidades carregadas
+        var unitIds = units.Select(u => u.Id).ToList();
+
+        // Carrega leads que pertençam a essas unidades
+        var leads = await _db.Leads
+            .Where(l => l.UnitId != null && unitIds.Contains(l.UnitId.Value))
+            .ToListAsync();
+
+        // Agrupa leads por UnitId e associa a cada unidade
+        var leadsByUnit = leads
+            .GroupBy(l => l.UnitId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var unit in units)
+        {
+            leadsByUnit.TryGetValue(unit.Id, out var list);
+            unit.Leads = list ?? [];
+        }
+
+        return units;
     }
 }

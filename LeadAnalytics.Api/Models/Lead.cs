@@ -23,20 +23,21 @@ public class Lead
     public bool HasAppointment { get; set; } = false;
     public string? ConversationState { get; set; }
 
-    // ─── Anúncio ─────────────────────────────────
     public string? LastAdId { get; set; }
     public int? IdChannelIntegration { get; set; }
 
+    public string? Campaign { get; set; }
+    public string? Ad { get; set; }
+    public string? SourceFinal { get; set; }
+    public string? TrackingConfidence { get; set; }
+
     public string? Tags { get; set; }
     public string? AdData { get; set; }
-    // Dados do anúncio salvos como JSON
-
-    // ─── Datas ───────────────────────────────────
+ 
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public DateTime? ConvertedAt { get; set; }
 
-    // Relacionamento com a unidade
     public int? UnitId { get; set; }
     public Unit? Unit { get; set; }
 }
