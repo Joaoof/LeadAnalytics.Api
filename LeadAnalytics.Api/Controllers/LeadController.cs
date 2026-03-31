@@ -74,4 +74,18 @@ public class WebhooksController : ControllerBase
             quantidade
         });
     }
+
+    [HttpGet("origens")]
+    public async Task<IActionResult> GetOrigens(int clinicId)
+    {
+        var result = await _leadService.VerificarOrigemAgrupada(clinicId);
+        return Ok(result);
+    }
+
+    [HttpGet("fim-de-semana")]
+    public async Task<IActionResult> GetLeadsFinaldeSemana(int clinicId)
+    {
+        var leads = await _leadService.LeadsFinaldeSemana(clinicId);
+        return Ok(new { quantidade = leads.Count, leads });
+    }
 }

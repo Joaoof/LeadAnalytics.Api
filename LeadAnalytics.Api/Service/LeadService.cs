@@ -256,6 +256,40 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .CountAsync();
     }
 
+    public async Task<List<object>> VerificarOrigemAgrupada(int clinicId)
+    {
+        return await _db.Leads
+            .Where(l => l.UnitId == clinicId)
+            .GroupBy(l => l.SourceFinal)
+            .Select(g => new
+            {
+                Origem = g.Key,
+                Quantidade = g.Count()
+            })
+            .ToListAsync<object>();
+    }
+
+    public async Task<List<Lead>> LeadsFinaldeSemana(int clinicId)
+    {
+        var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+        var leads = await _db.Leadss
+            .Where(l => l.TenantId == clinicId)
+            .ToListAsync();
+
+        return [.. leads.Where(l =>
+        {
+            var local = TimeZoneInfo.ConvertTimeFromUtc(l.CreatedAt, brazilTz);
+            return local.DayOfWeek switch
+            {
+                DayOfWeek.Saturday => local.Hour >= 18,
+                DayOfWeek.Sunday   => true,
+                DayOfWeek.Monday   => local.Hour < 18,
+                _                  => false
+            };
+        })];
+    }
+
     //public async Task<List<CloudiaWebhookDto>> PegarAnunciosLeads(CloudiaWebhookDto dto, int clinicId)
     //{
     //    var leads = await _db.Leads.Where(l => l.Unit.ClinicId == clinicId && l.AdData != null).ToListAsync();
