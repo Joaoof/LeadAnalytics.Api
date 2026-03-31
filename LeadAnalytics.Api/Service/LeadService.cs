@@ -273,7 +273,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     {
         var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
-        var leads = await _db.Leadss
+        var leads = await _db.Leads
             .Where(l => l.TenantId == clinicId)
             .ToListAsync();
 
