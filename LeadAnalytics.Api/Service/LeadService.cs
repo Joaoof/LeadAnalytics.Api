@@ -1,7 +1,6 @@
 ﻿using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
@@ -169,6 +168,13 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         lead?.UpdatedAt = DateTime.UtcNow;
 
+        lead?.StageHistory.Add(new LeadStageHistory
+        {
+            Stage = dto.Stage,
+            StageId = dto.IdStage,
+            ChangedAt = DateTime.UtcNow,
+        });
+
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Lead atualizado: {Id}", externalId);
@@ -204,7 +210,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     public async Task<int> VerificarConsultasFechadas(int clinicId)
     {
         return await _db.Leads
-            .Where(l => l.UnitId == clinicId && l.Stage == "10_EM_TRATAMENTO" || l.Stage == "9_FECHOU_TRATAMENTO").CountAsync();
+            .Where(l => l.UnitId == clinicId && l.Stage == "10_EM_TRATAMENTO" || l.Stage == "9_FECHOU_TRATAMENTO").Distinct().CountAsync();
     }
 
     public async Task<int> VerificarEtapaSemPagamento(int clinicId)
@@ -221,10 +227,10 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .CountAsync();
     }
 
-    public async Task<List<object>> VerificarOrigemAgrupada(int clinicId)
+    public async Task<List<object>> VerificarSourceFinal(int clinicId)
     {
         return await _db.Leads
-            .Where(l => l.UnitId == clinicId)
+            .Where(l => l.TenantId == clinicId)
             .GroupBy(l => l.SourceFinal)
             .Select(g => new
             {
@@ -232,6 +238,31 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 Quantidade = g.Count()
             })
             .ToListAsync<object>();
+    }
+
+    public async Task<List<OrigemAgrupadaDto>> VerificarOrigemCloudia(int clinicId)
+    {
+        return await _db.Leads.Where(l => l.TenantId == clinicId)
+            .GroupBy(l => l.Origin)
+            .Select(g => new OrigemAgrupadaDto
+            {
+                Origem = g.Key ?? "SEM_ORIGEM",
+                Quantidade = g.Count()
+            })
+            .ToListAsync();
+    }
+
+    public async Task<List<EtapaAgrupadaDto>> VerificarEtapaAgrupada(int clinicId)
+    {
+        return await _db.Leads
+            .Where(l => l.TenantId == clinicId)
+            .GroupBy(l => l.Stage)
+            .Select(g => new EtapaAgrupadaDto
+            {
+                Etapa = g.Key ?? "SEM_ETAPA",
+                Quantidade = g.Count()
+            })
+            .ToListAsync();
     }
 
     public async Task<List<Lead>> LeadsFinaldeSemana(int clinicId)

@@ -47,6 +47,7 @@ public class WebhooksController : ControllerBase
         return await Task.FromResult<IActionResult>(Ok(result));
     }
 
+
     [HttpGet("sem-pagamento")]
     public async Task<IActionResult> GetLeadsWithoutPayment(int clinicId)
     {
@@ -90,10 +91,17 @@ public class WebhooksController : ControllerBase
         });
     }
 
-    [HttpGet("origens")]
+    [HttpGet("source-final")]
+    public async Task<IActionResult> GetSourceFinally(int clinicId)
+    {
+        var result = await _leadService.VerificarSourceFinal(clinicId);
+        return Ok(result);
+    }
+
+    [HttpGet("origem-cloudia")]
     public async Task<IActionResult> GetOrigens(int clinicId)
     {
-        var result = await _leadService.VerificarOrigemAgrupada(clinicId);
+        var result = await _leadService.VerificarOrigemCloudia(clinicId);
         return Ok(result);
     }
 
@@ -102,5 +110,16 @@ public class WebhooksController : ControllerBase
     {
         var leads = await _leadService.LeadsFinaldeSemana(clinicId);
         return Ok(new { quantidade = leads.Count, leads });
+    }
+
+    [HttpGet("etapa-agrupada")]
+    public async Task<IActionResult> GetEtapaAgrupada([FromQuery] int clinicId)
+    {
+        var result = await _leadService.VerificarEtapaAgrupada(clinicId);
+
+        if (clinicId <= 0)
+            return BadRequest("clinicId inválido");
+
+        return Ok(result);
     }
 }

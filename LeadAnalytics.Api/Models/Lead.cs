@@ -14,6 +14,7 @@ public class Lead
     public string? Cpf { get; set; }
     public string? Gender { get; set; }
     public string? Origin { get; set; }
+    public string CurrentStage { get; set; } = "NOVO";
     public string? Observations { get; set; }
     public string? IdFacebookApp { get; set; }
     public bool? HasHealthInsurancePlan { get; set; }
@@ -21,6 +22,8 @@ public class Lead
     public int? IdStage { get; set; }
     public string Status { get; set; } = "new";
     public bool HasAppointment { get; set; } = false;
+    public bool HasPayment { get; set; }
+
     public string? ConversationState { get; set; }
 
     public string? LastAdId { get; set; }
@@ -40,4 +43,7 @@ public class Lead
 
     public int? UnitId { get; set; }
     public Unit? Unit { get; set; }
+
+    public ICollection<LeadStageHistory> StageHistory { get; set; } = new List<LeadStageHistory>();
+    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }
