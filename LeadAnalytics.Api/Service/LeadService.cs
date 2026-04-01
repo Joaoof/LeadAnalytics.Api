@@ -201,51 +201,16 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    public async Task<ProblemDetails> VerificarConsultasFechadas(int clinicId)
+    public async Task<int> VerificarConsultasFechadas(int clinicId)
     {
-        var verificarLeads = await _db.Units
-            .Where(l => l.ClinicId == clinicId)
-            .Select(l => l.Leads.Select(l => l.Stage == "10_EM_TRATAMENTO" || l.Stage == "9_FECHOU_TRATAMENTO"))
-            .ToListAsync();
-
-        if (verificarLeads.Count == 0)
-        {
-            return new ProblemDetails
-            {
-                Status = 404,
-                Title = "Nenhuma consulta fechada" 
-            };
-        }
-
-        return new ProblemDetails
-        {
-            Status = 200,
-            Title = "Consultas encontradas",
-            Extensions = new Dictionary<string, object?> { ["count"] = verificarLeads.Count }
-        };
+        return await _db.Leads
+            .Where(l => l.UnitId == clinicId && l.Stage == "10_EM_TRATAMENTO" || l.Stage == "9_FECHOU_TRATAMENTO").CountAsync();
     }
 
-    public async Task<ProblemDetails> VerificarEtapaSemPagamento(int clinicId)
+    public async Task<int> VerificarEtapaSemPagamento(int clinicId)
     {
-        var verificarPagamento = await _db.Units
-            .Where(l => l.ClinicId == clinicId)
-            .Select(l => l.Leads.Select(l => l.Stage == "04_AGENDADO_SEM_PAGAMENTO")).ToListAsync();
-
-        if (verificarPagamento.Count == 0)
-        {
-            return new ProblemDetails
-            {
-                Status = 404,
-                Title = "Nenhuma consulta agendada sem pagamento"
-            };
-        }
-
-        return new ProblemDetails
-        {
-            Status = 200,
-            Title = "Agendados sem pagamento",
-            Extensions = new Dictionary<string, object?> { ["quantidade"] = verificarPagamento.Count }
-        };
+        return await _db.Leads
+            .Where(l => l.UnitId == clinicId && l.Stage == "04_AGENDADO_SEM_PAGAMENTO").CountAsync();
     }
 
     public async Task<int> VerificarEtapaComPagamento(int clinicId)

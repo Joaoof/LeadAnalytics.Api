@@ -50,8 +50,23 @@ public class WebhooksController : ControllerBase
     [HttpGet("sem-pagamento")]
     public async Task<IActionResult> GetLeadsWithoutPayment(int clinicId)
     {
+
         var result = await _leadService.VerificarEtapaSemPagamento(clinicId);
-        return await Task.FromResult<IActionResult>(Ok(result));
+
+        if(result == 0)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Nenhuma consulta agendada sem pagamento",
+                Status = 404
+            });
+        }
+
+        return Ok(new
+        {
+            mensagem = "Agendados sem pagamento",
+            result
+        });
     }
 
     [HttpGet("com-pagamento")]
