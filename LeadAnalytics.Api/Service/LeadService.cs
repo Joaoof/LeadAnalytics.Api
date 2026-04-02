@@ -51,7 +51,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         var (source, campaign, ad, confidence) = ResolverTracking(dto);
 
-        var stageLabel = dto.Stage ?? "NOVO";
+        var stageLabel = dto.Stage;
         var stageId = dto.IdStage;
 
         var newLead = new Lead
