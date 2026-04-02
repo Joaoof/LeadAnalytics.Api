@@ -159,7 +159,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         lead.Ad = ad;
         lead.TrackingConfidence = confidence;
 
-        if (!string.IsNullOrWhiteSpace(dto.Stage))
+        if (dto.Stage is not null)
         {
             var novoStage = dto.Stage!;
             var novoStageId = dto.IdStage;
