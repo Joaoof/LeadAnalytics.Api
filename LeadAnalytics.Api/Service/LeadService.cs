@@ -140,7 +140,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.Gender is not null) lead.Gender = dto.Gender;
         if (dto.Observations is not null) lead.Observations = dto.Observations;
         if (dto.IdFacebookApp is not null) lead.IdFacebookApp = dto.IdFacebookApp;
-        if (dto.HasHealthInsurancePlan) lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
+        if ((bool)dto.HasHealthInsurancePlan) lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
         if (dto.IdChannelIntegration.HasValue) lead.IdChannelIntegration = dto.IdChannelIntegration;
         if (dto.LastAdId is not null) lead.LastAdId = dto.LastAdId;
         if (dto.ConversationState is not null) lead.ConversationState = dto.ConversationState;
