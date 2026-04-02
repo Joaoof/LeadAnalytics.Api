@@ -2,7 +2,6 @@
 using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
-using System.Globalization;
 using System.Text.Json;
 
 namespace LeadAnalytics.Api.Service;
@@ -266,7 +265,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync();
     }
 
-    public async Task<List<Lead>> LeadsFinaldeSemana(int clinicId)
+    public async Task<IEnumerable<Lead>> LeadsFinaldeSemana(int clinicId)
     {
         var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
@@ -287,7 +286,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         })];
     }
 
-    public async Task<List<Lead>> LeadsComCampanha(int clinicId)
+    public async Task<IEnumerable<Lead>> LeadsComCampanha(int clinicId)
     {
         var leads = await _db.Leads
             .Where(l => l.TenantId == clinicId && l.Campaign != null)
@@ -302,17 +301,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync();
         return leads;
     }
-
-    //public async Task<List<LeadsSemanaDto>> BuscarLeadsDaPrimeiraSemana(int clinicId)
-    //{
-    //    var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
-
-    //    var leads = await _db.Leads
-    //        .Where(l => l.TenantId == clinicId)
-    //        .ToListAsync();
-    //}
-
-    public async Task<List<LeadsMesDto>> BuscarInicioEFimMesLeads(int clinicId, DateTime dataInicio, DateTime finalData) {
+    public async Task<IEnumerable<LeadsMesDto>> BuscarInicioEFimMesLeads(int clinicId, DateTime dataInicio, DateTime finalData) {
         var dataInicioLocal = TimeZoneInfo.ConvertTimeToUtc(dataInicio, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
         var dataFinalLocal = TimeZoneInfo.ConvertTimeToUtc(finalData, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo")).AddDays(1);
 
@@ -320,34 +309,67 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
            .Where(l => l.TenantId == clinicId && l.CreatedAt >= dataInicioLocal && l.CreatedAt < dataFinalLocal)
            .ToListAsync();
 
-        return leads.GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
+        return  leads.GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
                     .Select(g => new LeadsMesDto
                     {
                         Ano = g.Key.Year,
                         Mes = g.Key.Month,
                         Quantidade = g.Count()
-                    })
-                    .ToList();
+                    });
     }
 
-    public async Task<List<LeadsMesDto>> ConsultaLeadsPorPeriodoService(FiltroLeadsPeriodoDto filtro)
+    public async Task<IEnumerable<LeadsMesDto>> ConsultaLeadsPorPeriodoService(FiltroLeadsPeriodoDto filtro)
     {
+        var leadsQuery = _db.Leads
+            .Where(l => l.TenantId == filtro.ClinicId);
 
+        var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+        // 🔹 Filtro por ano (obrigatório)
+        var inicioAnoLocal = new DateTime(filtro.Ano, 1, 1, 0, 0, 0, DateTimeKind.Unspecified);
+        var inicioAnoUtc = TimeZoneInfo.ConvertTimeToUtc(inicioAnoLocal, tz);
+        var fimAnoUtc = TimeZoneInfo.ConvertTimeToUtc(inicioAnoLocal.AddYears(1), tz);
+
+        leadsQuery = leadsQuery
+            .Where(l => l.CreatedAt >= inicioAnoUtc && l.CreatedAt < fimAnoUtc);
+
+        // 🔹 Filtro por mês (opcional)
+        if (filtro.Mes.HasValue)
+        {
+            var inicioMesLocal = new DateTime(filtro.Ano, filtro.Mes.Value, 1, 0, 0, 0, DateTimeKind.Unspecified);
+            var inicioMesUtc = TimeZoneInfo.ConvertTimeToUtc(inicioMesLocal, tz);
+            var fimMesUtc = TimeZoneInfo.ConvertTimeToUtc(inicioMesLocal.AddMonths(1), tz);
+
+            leadsQuery = leadsQuery
+                .Where(l => l.CreatedAt >= inicioMesUtc && l.CreatedAt < fimMesUtc);
+        }
+
+        // 🔹 Filtro por dia (opcional)
+        if (filtro.Dia.HasValue)
+        {
+            var inicioDiaLocal = new DateTime(filtro.Ano, filtro.Mes ?? 1, filtro.Dia.Value, 0, 0, 0, DateTimeKind.Unspecified);
+            var inicioDiaUtc = TimeZoneInfo.ConvertTimeToUtc(inicioDiaLocal, tz);
+            var fimDiaUtc = TimeZoneInfo.ConvertTimeToUtc(inicioDiaLocal.AddDays(1), tz);
+
+            leadsQuery = leadsQuery
+                .Where(l => l.CreatedAt >= inicioDiaUtc && l.CreatedAt < fimDiaUtc);
+        }
+
+        // 🔹 Agrupamento por mês (correto)
+         var resultado = await leadsQuery
+            .GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
+            .Select(g => new LeadsMesDto
+            {
+                Ano = g.Key.Year,
+                Mes = g.Key.Month,
+                Quantidade = g.Count()
+            })
+            .OrderBy(x => x.Ano)
+            .ThenBy(x => x.Mes)
+            .ToListAsync();
+
+        return resultado;
     }
-
-    //public async Task<List<CloudiaWebhookDto>> PegarAnunciosLeads(CloudiaWebhookDto dto, int clinicId)
-    //{
-    //    var leads = await _db.Leads.Where(l => l.Unit.ClinicId == clinicId && l.AdData != null).ToListAsync();
-
-    //    if(dto.Data.AdData)
-    //    {
-
-    //    }
-
-
-    //}
-
-    //public async Task<>
 }
 
 public enum ProcessResult { Created, Updated, Ignored }

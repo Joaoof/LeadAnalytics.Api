@@ -20,9 +20,9 @@ public class WebhooksController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetAllLeads()
+    public async Task<IActionResult> GetAllLeads()
     {
-        var leads = _leadService.TrazerTodosLeads().Result;
+        var leads = await _leadService.TrazerTodosLeads();
         return Ok(leads);
     }
 
@@ -32,19 +32,21 @@ public class WebhooksController : ControllerBase
         // Loga o tipo do evento que chegou
         if(_logger.IsEnabled(LogLevel.Information))
         {
-            _logger.LogInformation("Webhook recebido: {Type}", dto.Type);
+            _logger.LogInformation("Webhook recebido: {Type}", dto?.Type);
         }
 
         var result = await _leadService.SaveLeadAsync(dto);
 
-        return Ok(new { result = result.ToString() });
+        var resultString = result.ToString() ?? string.Empty;
+
+        return Ok(new { result = resultString });
     }
 
     [HttpGet("consultas")]
     public async Task<IActionResult> GetHasAppoiment(int clinicId)
     {
         var result = await _leadService.VerificarConsultasFechadas(clinicId);
-        return await Task.FromResult<IActionResult>(Ok(result));
+        return Ok(result);
     }
 
 
@@ -109,7 +111,7 @@ public class WebhooksController : ControllerBase
     public async Task<IActionResult> GetLeadsFinaldeSemana(int clinicId)
     {
         var leads = await _leadService.LeadsFinaldeSemana(clinicId);
-        return Ok(new { quantidade = leads.Count, leads });
+        return Ok(leads);    
     }
 
     [HttpGet("etapa-agrupada")]
@@ -131,6 +133,22 @@ public class WebhooksController : ControllerBase
         if (dataInicio > dataFim)
             return BadRequest("dataInicio deve ser menor ou igual a dataFim");
         var result = await _leadService.BuscarInicioEFimMesLeads(clinicId, dataInicio, dataFim);
+        return Ok(result);
+    }
+
+    [HttpGet("consulta-periodos")]
+    public async Task<IActionResult> GetConsultaPeriodos([FromQuery] FiltroLeadsPeriodoDto filtro)
+    {
+        if (filtro.ClinicId <= 0)
+            return BadRequest("clinicId inválido");
+        if (filtro.Ano <= 0)
+            return BadRequest("Ano inválido");
+        if (filtro.Mes.HasValue && (filtro.Mes < 1 || filtro.Mes > 12))
+            return BadRequest("Mês deve ser entre 1 e 12");
+        if (filtro.Dia.HasValue && (filtro.Dia < 1 || filtro.Dia > 31))
+            return BadRequest("Dia deve ser entre 1 e 31");
+
+        var result = await _leadService.ConsultaLeadsPorPeriodoService(filtro);
         return Ok(result);
     }
 }
