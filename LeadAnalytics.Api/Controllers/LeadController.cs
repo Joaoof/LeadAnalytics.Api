@@ -27,19 +27,15 @@ public class WebhooksController : ControllerBase
     }
 
     [HttpPost("cloudia")]
-    public async Task<IActionResult> Cloudia([FromBody] CloudiaWebhookDto? dto)
+    public async Task<IActionResult> Cloudia([FromBody] CloudiaWebhookDto dto)
     {
-        // Loga o tipo do evento que chegou
-        if(_logger.IsEnabled(LogLevel.Information))
+        if (!ModelState.IsValid)
         {
-            _logger.LogInformation("Webhook recebido: {Type}", dto?.Type);
+            return BadRequest(ModelState);
         }
 
         var result = await _leadService.SaveLeadAsync(dto);
-
-        var resultString = result.ToString() ?? string.Empty;
-
-        return Ok(new { result = resultString });
+        return Ok(result);
     }
 
     [HttpGet("consultas")]
