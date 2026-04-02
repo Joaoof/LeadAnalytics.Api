@@ -14,22 +14,20 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
     public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
     {
-
         return dto.Type switch
         {
             "CUSTOMER_CREATED" => await CriarLead(dto.Data),
             "CUSTOMER_UPDATED" => await AtualizarLead(dto.Data),
-            "CUSTOMER_TAGS_UPDATED" => await AtualizarTagUsuário(dto),
+            "CUSTOMER_TAGS_UPDATED" => await AtualizarTagUsuario(dto),
             _ => ProcessResult.Ignored
         };
     }
 
-
     public async Task<List<Lead>> TrazerTodosLeads()
     {
-        var leads = await _db.Leads.ToListAsync();
-
-        return leads;
+        return await _db.Leads
+            .AsNoTracking()
+            .ToListAsync();
     }
 
     private async Task<ProcessResult> CriarLead(CloudiaLeadDataDto dto)
@@ -37,53 +35,84 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
 
-        // 1. Esse lead já existe no banco?
-        var searchLead = await _db.Leads
+        var leadExistente = await _db.Leads
+            .Include(l => l.StageHistory)
             .FirstOrDefaultAsync(l =>
                 l.ExternalId == externalId &&
                 l.TenantId == tenantId);
 
-        var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
-
-        // 2. Já existe — ignora
-        if (searchLead is not null)
+        if (leadExistente is not null)
         {
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-            }
+            _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
             return ProcessResult.Ignored;
         }
 
-        // 3. Não existe — cria
+        var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
+
+        var (source, campaign, ad, confidence) = ResolverTracking(dto);
+
+        var stageLabel = dto.Stage ?? "NOVO";
+        var stageId = dto.IdStage;
+
         var newLead = new Lead
         {
-            Id = dto.Id,
             ExternalId = externalId,
             TenantId = tenantId,
+
             Name = dto.Name ?? "Sem nome",
             Phone = dto.Phone ?? "Sem telefone",
             Email = dto.Email,
-            Origin = dto.Origin ?? "Sem origem",
-            Stage = dto.Stage,
-            Tags = dto.Tags is not null              // ← adiciona
-                 ? JsonSerializer.Serialize(dto.Tags)
-                 : null,
+            Cpf = dto.Cpf,
+            Gender = dto.Gender,
+            Observations = dto.Observations,
+            IdFacebookApp = dto.IdFacebookApp,
+            HasHealthInsurancePlan = dto.HasHealthInsurancePlan,
+            IdChannelIntegration = dto.IdChannelIntegration,
+            LastAdId = dto.LastAdId,
+            ConversationState = dto.ConversationState,
+
+            Source = source,
+            Channel = ResolverChannel(dto),
+            Campaign = campaign,
+            Ad = ad,
+            TrackingConfidence = confidence,
+
+            CurrentStage = stageLabel,
+            CurrentStageId = stageId,
+
+            Status = "new",
+            HasAppointment = PossuiAgendamento(stageLabel),
+            HasPayment = PossuiPagamento(stageLabel),
+
+            Tags = dto.Tags is not null
+                  ? JsonSerializer.Serialize(dto.Tags)
+                  : null,
+
             AdData = dto.AdData is not null
-                ? JsonSerializer.Serialize(dto.AdData)
-                : null,
+                  ? JsonSerializer.Serialize(dto.AdData)
+                  : null,
+
             UnitId = unit.Id,
+
             CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            ConvertedAt = PossuiPagamento(stageLabel) ? DateTime.UtcNow : null,
+
+            StageHistory = new List<LeadStageHistory>
+            {
+                new LeadStageHistory
+                {
+                    StageId = stageId ?? 0,
+                    StageLabel = stageLabel,
+                    ChangedAt = DateTime.UtcNow
+                }
+            }
         };
 
         _db.Leads.Add(newLead);
         await _db.SaveChangesAsync();
 
-        if (_logger.IsEnabled(LogLevel.Information))
-        {
-            _logger.LogInformation("Lead criado: {Id}", externalId);
-        }
-
+        _logger.LogInformation("Lead criado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
         return ProcessResult.Created;
     }
 
@@ -92,146 +121,147 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
 
-        var lead = await _db.Leads.FirstOrDefaultAsync(l => l.ExternalId == externalId &&
-            l.TenantId == tenantId);
+        var lead = await _db.Leads
+            .Include(l => l.StageHistory)
+            .FirstOrDefaultAsync(l =>
+                l.ExternalId == externalId &&
+                l.TenantId == tenantId);
 
         if (lead is null)
         {
-            _logger.LogWarning("Lead não encontrado para atualizar: {Id}", externalId);
+            _logger.LogWarning("Lead não encontrado para atualizar: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
             return ProcessResult.Ignored;
         }
 
-        // Existe — atualiza só os campos que vieram preenchidos
-        if (dto.Name is not null) lead?.Name = dto.Name;
-        if (dto.Phone is not null) lead?.Phone = dto.Phone;
-        if (dto.Email is not null) lead?.Email = dto.Email;
-        if (dto.Stage is not null) lead?.Stage = dto.Stage;
-        if (dto.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Tags);
+        if (dto.Name is not null) lead.Name = dto.Name;
+        if (dto.Phone is not null) lead.Phone = dto.Phone;
+        if (dto.Email is not null) lead.Email = dto.Email;
+        if (dto.Cpf is not null) lead.Cpf = dto.Cpf;
+        if (dto.Gender is not null) lead.Gender = dto.Gender;
+        if (dto.Observations is not null) lead.Observations = dto.Observations;
+        if (dto.IdFacebookApp is not null) lead.IdFacebookApp = dto.IdFacebookApp;
+        if (dto.HasHealthInsurancePlan) lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
+        if (dto.IdChannelIntegration.HasValue) lead.IdChannelIntegration = dto.IdChannelIntegration;
+        if (dto.LastAdId is not null) lead.LastAdId = dto.LastAdId;
+        if (dto.ConversationState is not null) lead.ConversationState = dto.ConversationState;
+
+        if (dto.Tags is not null)
+            lead.Tags = JsonSerializer.Serialize(dto.Tags);
+
         if (dto.AdData is not null)
-        {
-            // salva JSON bruto
-            lead?.AdData = JsonSerializer.Serialize(dto.AdData);
+            lead.AdData = JsonSerializer.Serialize(dto.AdData);
 
-            var lista = dto.AdData
-                .Select(a => new AdDataDto
+        var (source, campaign, ad, confidence) = ResolverTracking(dto);
+
+        lead.Source = source;
+        lead.Channel = ResolverChannel(dto);
+        lead.Campaign = campaign;
+        lead.Ad = ad;
+        lead.TrackingConfidence = confidence;
+
+        if (!string.IsNullOrWhiteSpace(dto.Stage))
+        {
+            var novoStage = dto.Stage!;
+            var novoStageId = dto.IdStage;
+
+            if (lead.CurrentStage != novoStage || lead.CurrentStageId != novoStageId)
+            {
+                lead.CurrentStage = novoStage;
+                lead.CurrentStageId = novoStageId;
+
+                lead.StageHistory.Add(new LeadStageHistory
                 {
-                    Id = a.AdId ?? string.Empty,
-                    AdName = a.AdName ?? string.Empty,
-                    source = a.Source ?? string.Empty
-                })
-                .ToList();
-
-            if (dto.AdData is not null && dto.AdData.Count > 0)
-            {
-                var item = lista[0];
-
-                lead?.Campaign = string.IsNullOrEmpty(item.Id) ? "DESCONHECIDA" : item.Id;
-                lead?.Ad = string.IsNullOrEmpty(item.AdName) ? "DESCONHECIDO" : item.AdName;
-                lead?.SourceFinal = !string.IsNullOrEmpty(item.source) ? item.source : dto.Origin ?? "DESCONHECIDO";
-                lead?.TrackingConfidence = "ALTA";
-            }
-        }
-        else
-        {
-            // fallback
-            if (!string.IsNullOrEmpty(dto.Origin))
-            {
-                lead?.SourceFinal = dto.Origin;
-                lead?.TrackingConfidence = "MEDIA";
-            }
-            else
-            {
-                lead?.SourceFinal = "DESCONHECIDO";
-                lead?.TrackingConfidence = "BAIXA";
+                    LeadId = lead.Id,
+                    StageId = (int)novoStageId,
+                    StageLabel = novoStage,
+                    ChangedAt = DateTime.UtcNow
+                });
             }
 
-            lead?.Campaign = "DESCONHECIDA";
-            lead?.Ad = "DESCONHECIDO";
+            lead.HasAppointment = PossuiAgendamento(novoStage);
+            lead.HasPayment = PossuiPagamento(novoStage);
 
-            if (dto.AdData is not null)
-            {
-                lead?.AdData = JsonSerializer.Serialize(dto.AdData);
-            }
-
-        }
-        if (dto.Observations is not null) lead?.Observations = dto.Observations;
-
-        if (dto.Stage == "10_EM_TRATAMENTO" || dto.Stage == "09_FECHOU_TRATAMENTO")
-        {
-            lead?.HasAppointment = true;
+            if (lead.HasPayment && lead.ConvertedAt is null)
+                lead.ConvertedAt = DateTime.UtcNow;
         }
 
-        if (dto.Stage == "03_LEAD_QUENTE_QUALIFICADO")
-        {
-            lead?.HasAppointment = false;
-        }
-
-        lead?.UpdatedAt = DateTime.UtcNow;
-
-        lead?.StageHistory.Add(new LeadStageHistory
-        {
-            Stage = dto.Stage,
-            StageId = dto.IdStage,
-            ChangedAt = DateTime.UtcNow,
-        });
+        lead.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Lead atualizado: {Id}", externalId);
+        _logger.LogInformation("Lead atualizado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
         return ProcessResult.Updated;
     }
 
-    public async Task<ProcessResult> AtualizarTagUsuário(CloudiaWebhookDto dto)
+    public async Task<ProcessResult> AtualizarTagUsuario(CloudiaWebhookDto dto)
     {
         var externalId = dto.Data.Id;
         var tenantId = dto.Data.ClinicId;
 
-        _logger.LogInformation("Tags recebidas: {Tags}", JsonSerializer.Serialize(dto.Data.Tags));
+        _logger.LogInformation("Tags recebidas para {ExternalId}: {Tags}",
+            externalId,
+            JsonSerializer.Serialize(dto.Data.Tags));
 
-
-        var lead = await _db.Leads.FirstOrDefaultAsync(l => l.ExternalId == externalId &&
-        l.TenantId == tenantId);
+        var lead = await _db.Leads
+            .FirstOrDefaultAsync(l =>
+                l.ExternalId == externalId &&
+                l.TenantId == tenantId);
 
         if (lead is null)
         {
-            _logger.LogWarning("Lead não encontrado para atualizar: {Id}", externalId);
+            _logger.LogWarning("Lead não encontrado para atualizar tags: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
             return ProcessResult.Ignored;
         }
 
-        if (dto.Data.Tags is not null) lead?.Tags = JsonSerializer.Serialize(dto.Data.Tags);
-        lead?.UpdatedAt = DateTime.UtcNow;
+        if (dto.Data.Tags is not null)
+            lead.Tags = JsonSerializer.Serialize(dto.Data.Tags);
+
+        lead.UpdatedAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Lead atualizado: {Id}", externalId);
+        _logger.LogInformation("Tags do lead atualizadas: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
         return ProcessResult.Updated;
     }
 
     public async Task<int> VerificarConsultasFechadas(int clinicId)
     {
         return await _db.Leads
-            .Where(l => l.UnitId == clinicId && l.Stage == "10_EM_TRATAMENTO" || l.Stage == "9_FECHOU_TRATAMENTO").Distinct().CountAsync();
+            .AsNoTracking()
+            .Where(l =>
+                l.UnitId == clinicId &&
+                (l.CurrentStage == "10_EM_TRATAMENTO" || l.CurrentStage == "09_FECHOU_TRATAMENTO"))
+            .Select(l => l.Id)
+            .Distinct()
+            .CountAsync();
     }
 
     public async Task<int> VerificarEtapaSemPagamento(int clinicId)
     {
         return await _db.Leads
-            .Where(l => l.UnitId == clinicId && l.Stage == "04_AGENDADO_SEM_PAGAMENTO").CountAsync();
+            .AsNoTracking()
+            .Where(l =>
+                l.UnitId == clinicId &&
+                l.CurrentStage == "04_AGENDADO_SEM_PAGAMENTO")
+            .CountAsync();
     }
 
     public async Task<int> VerificarEtapaComPagamento(int clinicId)
     {
         return await _db.Leads
-            .Where(l => l.UnitId == clinicId &&
-                        l.Stage == "05_AGENDADO_COM_PAGAMENTO")
+            .AsNoTracking()
+            .Where(l =>
+                l.UnitId == clinicId &&
+                l.CurrentStage == "05_AGENDADO_COM_PAGAMENTO")
             .CountAsync();
     }
 
     public async Task<List<object>> VerificarSourceFinal(int clinicId)
     {
         return await _db.Leads
+            .AsNoTracking()
             .Where(l => l.TenantId == clinicId)
-            .GroupBy(l => l.SourceFinal)
+            .GroupBy(l => l.Source)
             .Select(g => new
             {
                 Origem = g.Key,
@@ -242,8 +272,10 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
     public async Task<List<OrigemAgrupadaDto>> VerificarOrigemCloudia(int clinicId)
     {
-        return await _db.Leads.Where(l => l.TenantId == clinicId)
-            .GroupBy(l => l.Origin)
+        return await _db.Leads
+            .AsNoTracking()
+            .Where(l => l.TenantId == clinicId)
+            .GroupBy(l => l.Source)
             .Select(g => new OrigemAgrupadaDto
             {
                 Origem = g.Key ?? "SEM_ORIGEM",
@@ -255,11 +287,14 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     public async Task<List<EtapaAgrupadaDto>> VerificarEtapaAgrupada(int clinicId)
     {
         return await _db.Leads
+            .AsNoTracking()
             .Where(l => l.TenantId == clinicId)
-            .GroupBy(l => l.Stage)
+            .GroupBy(l => string.IsNullOrWhiteSpace(l.CurrentStage)
+                ? "SEM_ETAPA"
+                : l.CurrentStage.Trim())
             .Select(g => new EtapaAgrupadaDto
             {
-                Etapa = g.Key ?? "SEM_ETAPA",
+                Etapa = g.Key,
                 Quantidade = g.Count()
             })
             .ToListAsync();
@@ -270,62 +305,78 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
         var leads = await _db.Leads
+            .AsNoTracking()
             .Where(l => l.TenantId == clinicId)
             .ToListAsync();
 
-        return [.. leads.Where(l =>
+        return leads.Where(l =>
         {
             var local = TimeZoneInfo.ConvertTimeFromUtc(l.CreatedAt, brazilTz);
             return local.DayOfWeek switch
             {
                 DayOfWeek.Saturday => local.Hour >= 18,
-                DayOfWeek.Sunday   => true,
-                DayOfWeek.Monday   => local.Hour < 18,
-                _                  => false
+                DayOfWeek.Sunday => true,
+                DayOfWeek.Monday => local.Hour < 18,
+                _ => false
             };
-        })];
+        }).ToList();
     }
 
     public async Task<IEnumerable<Lead>> LeadsComCampanha(int clinicId)
     {
-        var leads = await _db.Leads
-            .Where(l => l.TenantId == clinicId && l.Campaign != null)
+        return await _db.Leads
+            .AsNoTracking()
+            .Where(l => l.TenantId == clinicId && l.Campaign != null && l.Campaign != "DESCONHECIDO")
             .ToListAsync();
-        return leads;
     }
 
     public async Task<List<Lead>> LeadsComAd(int clinicId)
     {
-        var leads = await _db.Leads
-            .Where(l => l.TenantId == clinicId && l.Ad != null)
+        return await _db.Leads
+            .AsNoTracking()
+            .Where(l => l.TenantId == clinicId && l.Ad != null && l.Ad != "DESCONHECIDO")
             .ToListAsync();
-        return leads;
     }
-    public async Task<IEnumerable<LeadsMesDto>> BuscarInicioEFimMesLeads(int clinicId, DateTime dataInicio, DateTime finalData) {
-        var dataInicioLocal = TimeZoneInfo.ConvertTimeToUtc(dataInicio, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
-        var dataFinalLocal = TimeZoneInfo.ConvertTimeToUtc(finalData, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo")).AddDays(1);
+
+    public async Task<IEnumerable<LeadsMesDto>> BuscarInicioEFimMesLeads(int clinicId, DateTime dataInicio, DateTime finalData)
+    {
+        var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+        var dataInicioUtc = TimeZoneInfo.ConvertTimeToUtc(
+            DateTime.SpecifyKind(dataInicio, DateTimeKind.Unspecified), tz);
+
+        var dataFinalUtc = TimeZoneInfo.ConvertTimeToUtc(
+            DateTime.SpecifyKind(finalData, DateTimeKind.Unspecified), tz).AddDays(1);
 
         var leads = await _db.Leads
-           .Where(l => l.TenantId == clinicId && l.CreatedAt >= dataInicioLocal && l.CreatedAt < dataFinalLocal)
-           .ToListAsync();
+            .AsNoTracking()
+            .Where(l =>
+                l.TenantId == clinicId &&
+                l.CreatedAt >= dataInicioUtc &&
+                l.CreatedAt < dataFinalUtc)
+            .ToListAsync();
 
-        return  leads.GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
-                    .Select(g => new LeadsMesDto
-                    {
-                        Ano = g.Key.Year,
-                        Mes = g.Key.Month,
-                        Quantidade = g.Count()
-                    });
+        return leads
+            .GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
+            .Select(g => new LeadsMesDto
+            {
+                Ano = g.Key.Year,
+                Mes = g.Key.Month,
+                Quantidade = g.Count()
+            })
+            .OrderBy(x => x.Ano)
+            .ThenBy(x => x.Mes)
+            .ToList();
     }
 
     public async Task<IEnumerable<LeadsMesDto>> ConsultaLeadsPorPeriodoService(FiltroLeadsPeriodoDto filtro)
     {
         var leadsQuery = _db.Leads
+            .AsNoTracking()
             .Where(l => l.TenantId == filtro.ClinicId);
 
         var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
-        // 🔹 Filtro por ano (obrigatório)
         var inicioAnoLocal = new DateTime(filtro.Ano, 1, 1, 0, 0, 0, DateTimeKind.Unspecified);
         var inicioAnoUtc = TimeZoneInfo.ConvertTimeToUtc(inicioAnoLocal, tz);
         var fimAnoUtc = TimeZoneInfo.ConvertTimeToUtc(inicioAnoLocal.AddYears(1), tz);
@@ -333,7 +384,6 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         leadsQuery = leadsQuery
             .Where(l => l.CreatedAt >= inicioAnoUtc && l.CreatedAt < fimAnoUtc);
 
-        // 🔹 Filtro por mês (opcional)
         if (filtro.Mes.HasValue)
         {
             var inicioMesLocal = new DateTime(filtro.Ano, filtro.Mes.Value, 1, 0, 0, 0, DateTimeKind.Unspecified);
@@ -344,10 +394,15 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 .Where(l => l.CreatedAt >= inicioMesUtc && l.CreatedAt < fimMesUtc);
         }
 
-        // 🔹 Filtro por dia (opcional)
         if (filtro.Dia.HasValue)
         {
-            var inicioDiaLocal = new DateTime(filtro.Ano, filtro.Mes ?? 1, filtro.Dia.Value, 0, 0, 0, DateTimeKind.Unspecified);
+            var inicioDiaLocal = new DateTime(
+                filtro.Ano,
+                filtro.Mes ?? 1,
+                filtro.Dia.Value,
+                0, 0, 0,
+                DateTimeKind.Unspecified);
+
             var inicioDiaUtc = TimeZoneInfo.ConvertTimeToUtc(inicioDiaLocal, tz);
             var fimDiaUtc = TimeZoneInfo.ConvertTimeToUtc(inicioDiaLocal.AddDays(1), tz);
 
@@ -355,8 +410,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 .Where(l => l.CreatedAt >= inicioDiaUtc && l.CreatedAt < fimDiaUtc);
         }
 
-        // 🔹 Agrupamento por mês (correto)
-         var resultado = await leadsQuery
+        var resultado = await leadsQuery
             .GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
             .Select(g => new LeadsMesDto
             {
@@ -370,6 +424,75 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         return resultado;
     }
+
+    private static (string Source, string Campaign, string? Ad, string Confidence) ResolverTracking(CloudiaLeadDataDto dto)
+    {
+        if (dto.AdData is not null && dto.AdData.Count > 0)
+        {
+            var item = dto.AdData.First();
+
+            var source = !string.IsNullOrWhiteSpace(item.Source)
+                ? item.Source.Trim().ToUpperInvariant()
+                : (!string.IsNullOrWhiteSpace(dto.Origin)
+                    ? dto.Origin.Trim().ToUpperInvariant()
+                    : "DESCONHECIDO");
+
+            var campaign = !string.IsNullOrWhiteSpace(item.AdId)
+                ? item.AdId.Trim()
+                : "DESCONHECIDO";
+
+            var ad = !string.IsNullOrWhiteSpace(item.AdName)
+                ? item.AdName.Trim()
+                : "DESCONHECIDO";
+
+            return (source, campaign, ad, "ALTA");
+        }
+
+        if (!string.IsNullOrWhiteSpace(dto.Origin))
+        {
+            return (dto.Origin.Trim().ToUpperInvariant(), "DESCONHECIDO", "DESCONHECIDO", "MEDIA");
+        }
+
+        return ("DESCONHECIDO", "DESCONHECIDO", "DESCONHECIDO", "BAIXA");
+    }
+
+    private static string ResolverChannel(CloudiaLeadDataDto dto)
+    {
+        if (dto.RegisteredOnWhatsApp == 1 ||
+            !string.IsNullOrWhiteSpace(dto.IdWhatsApp) ||
+            dto.IdChannelIntegration.HasValue)
+        {
+            return "WHATSAPP";
+        }
+
+        return "DESCONHECIDO";
+    }
+
+    private static bool PossuiAgendamento(string? stage)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+            return false;
+
+        return stage is "04_AGENDADO_SEM_PAGAMENTO"
+            or "05_AGENDADO_COM_PAGAMENTO"
+            or "09_FECHOU_TRATAMENTO"
+            or "10_EM_TRATAMENTO";
+    }
+
+    private static bool PossuiPagamento(string? stage)
+    {
+        if (string.IsNullOrWhiteSpace(stage))
+            return false;
+
+        return stage is "05_AGENDADO_COM_PAGAMENTO"
+            or "09_FECHOU_TRATAMENTO"
+            or "10_EM_TRATAMENTO";
+    }
 }
 
-public enum ProcessResult { Created, Updated, Ignored }
+public enum ProcessResult
+{
+    Created,
+    Updated,
+    Ignored
+}

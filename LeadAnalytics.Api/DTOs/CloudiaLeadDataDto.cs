@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿using System;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace LeadAnalytics.Api.DTOs;
 
@@ -36,11 +38,18 @@ public class CloudiaLeadDataDto
     [JsonPropertyName("origin")]
     public string? Origin { get; set; }
 
+    [JsonPropertyName("has_health_insurance_plan")]
+    public bool HasHealthInsurancePlan { get; set; }
+
     [JsonPropertyName("clinic_id")]
     public int ClinicId { get; set; }
 
     [JsonPropertyName("stage")]
     public string? Stage { get; set; }
+
+    [JsonPropertyName("last_ad_id")]
+    public string? LastAdId { get; set; }
+
 
     [JsonPropertyName("id_stage")]
     public int? IdStage { get; set; }
@@ -59,6 +68,11 @@ public class CloudiaLeadDataDto
 
     [JsonPropertyName("tags")]
     public List<CloudiaTagDto>? Tags { get; set; }
+    public int? RegisteredOnWhatsApp { get; set; }
+    public string? IdWhatsApp { get; set; }
+    public string ConversationState { get; set; }
+    public string IdFacebookApp { get; set; }
+    public int? IdChannelIntegration { get; set; }
 }
 
 // Dados do anúncio
