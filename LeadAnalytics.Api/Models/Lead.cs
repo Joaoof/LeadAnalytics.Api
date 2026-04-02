@@ -44,6 +44,6 @@ public class Lead
     public int? UnitId { get; set; }
     public Unit? Unit { get; set; }
 
-    public ICollection<LeadStageHistory> StageHistory { get; set; } = new List<LeadStageHistory>();
-    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+    public ICollection<LeadStageHistory> StageHistory { get; set; } = [];
+    public ICollection<Payment> Payments { get; set; } = [];
 }
