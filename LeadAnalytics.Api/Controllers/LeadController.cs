@@ -122,4 +122,15 @@ public class WebhooksController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpGet("buscar-inicio-fim")]
+    public async Task<IActionResult> GetBuscarInicioFim([FromQuery] int clinicId, [FromQuery] DateTime dataInicio, [FromQuery] DateTime dataFim)
+    {
+        if (clinicId <= 0)
+            return BadRequest("clinicId inválido");
+        if (dataInicio > dataFim)
+            return BadRequest("dataInicio deve ser menor ou igual a dataFim");
+        var result = await _leadService.BuscarInicioEFimMesLeads(clinicId, dataInicio, dataFim);
+        return Ok(result);
+    }
 }

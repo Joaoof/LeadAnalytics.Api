@@ -2,6 +2,7 @@
 using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using System.Text.Json;
 
 namespace LeadAnalytics.Api.Service;
@@ -284,6 +285,54 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 _                  => false
             };
         })];
+    }
+
+    public async Task<List<Lead>> LeadsComCampanha(int clinicId)
+    {
+        var leads = await _db.Leads
+            .Where(l => l.TenantId == clinicId && l.Campaign != null)
+            .ToListAsync();
+        return leads;
+    }
+
+    public async Task<List<Lead>> LeadsComAd(int clinicId)
+    {
+        var leads = await _db.Leads
+            .Where(l => l.TenantId == clinicId && l.Ad != null)
+            .ToListAsync();
+        return leads;
+    }
+
+    //public async Task<List<LeadsSemanaDto>> BuscarLeadsDaPrimeiraSemana(int clinicId)
+    //{
+    //    var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+
+    //    var leads = await _db.Leads
+    //        .Where(l => l.TenantId == clinicId)
+    //        .ToListAsync();
+    //}
+
+    public async Task<List<LeadsMesDto>> BuscarInicioEFimMesLeads(int clinicId, DateTime dataInicio, DateTime finalData) {
+        var dataInicioLocal = TimeZoneInfo.ConvertTimeToUtc(dataInicio, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"));
+        var dataFinalLocal = TimeZoneInfo.ConvertTimeToUtc(finalData, TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo")).AddDays(1);
+
+        var leads = await _db.Leads
+           .Where(l => l.TenantId == clinicId && l.CreatedAt >= dataInicioLocal && l.CreatedAt < dataFinalLocal)
+           .ToListAsync();
+
+        return leads.GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
+                    .Select(g => new LeadsMesDto
+                    {
+                        Ano = g.Key.Year,
+                        Mes = g.Key.Month,
+                        Quantidade = g.Count()
+                    })
+                    .ToList();
+    }
+
+    public async Task<List<LeadsMesDto>> ConsultaLeadsPorPeriodoService(FiltroLeadsPeriodoDto filtro)
+    {
+
     }
 
     //public async Task<List<CloudiaWebhookDto>> PegarAnunciosLeads(CloudiaWebhookDto dto, int clinicId)
