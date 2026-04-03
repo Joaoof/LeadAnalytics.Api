@@ -123,6 +123,9 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         var lead = await _db.Leads
             .Include(l => l.StageHistory)
+            .Include(l => l.Conversations)
+                .ThenInclude(c => c.Interactions)
+            .Include(l => l.Payments)
             .FirstOrDefaultAsync(l =>
                 l.ExternalId == externalId &&
                 l.TenantId == tenantId);
@@ -133,6 +136,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             return ProcessResult.Ignored;
         }
 
+        // ── Campos simples ────────────────────────────────────────────
         if (dto.Name is not null) lead.Name = dto.Name;
         if (dto.Phone is not null) lead.Phone = dto.Phone;
         if (dto.Email is not null) lead.Email = dto.Email;
@@ -140,11 +144,9 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.Gender is not null) lead.Gender = dto.Gender;
         if (dto.Observations is not null) lead.Observations = dto.Observations;
         if (dto.IdFacebookApp is not null) lead.IdFacebookApp = dto.IdFacebookApp;
-        if (dto.HasHealthInsurancePlan.HasValue)
-            lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
+        if (dto.HasHealthInsurancePlan.HasValue) lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
         if (dto.IdChannelIntegration.HasValue) lead.IdChannelIntegration = dto.IdChannelIntegration;
         if (dto.LastAdId is not null) lead.LastAdId = dto.LastAdId;
-        if (dto.ConversationState is not null) lead.ConversationState = dto.ConversationState;
 
         if (dto.Tags is not null)
             lead.Tags = JsonSerializer.Serialize(dto.Tags);
@@ -152,24 +154,68 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.AdData is not null)
             lead.AdData = JsonSerializer.Serialize(dto.AdData);
 
+        // ── Tracking (só sobrescreve se vier dado melhor) ─────────────
         var (source, campaign, ad, confidence) = ResolverTracking(dto);
 
-        lead.Source = source;
-        lead.Channel = ResolverChannel(dto);
-        lead.Campaign = campaign;
-        lead.Ad = ad;
-        lead.TrackingConfidence = confidence;
+        if (source != "DESCONHECIDO") lead.Source = source;
+        if (campaign != "DESCONHECIDO") lead.Campaign = campaign;
+        if (ad != "DESCONHECIDO") lead.Ad = ad;
+        if (confidence == "ALTA" || lead.TrackingConfidence != "ALTA")
+            lead.TrackingConfidence = confidence;
 
+        lead.Channel = ResolverChannel(dto);
+
+        // ── Conversa / ConversationState ──────────────────────────────
+        if (dto.ConversationState is not null &&
+            dto.ConversationState != lead.ConversationState)
+        {
+            // Fecha a conversa aberta atual, se existir
+            var conversaAberta = lead.Conversations
+                .FirstOrDefault(c => c.EndedAt is null);
+
+            if (conversaAberta is not null)
+            {
+                conversaAberta.EndedAt = DateTime.UtcNow;
+
+                conversaAberta.Interactions.Add(new LeadInteraction
+                {
+                    Type = "STATE_CHANGED",
+                    Content = $"{lead.ConversationState} → {dto.ConversationState}",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+
+            // Abre nova conversa com o novo estado
+            var novaConversa = new LeadConversation
+            {
+                LeadId = lead.Id,
+                Channel = lead.Channel,
+                Source = lead.Source,
+                ConversationState = dto.ConversationState,
+                StartedAt = DateTime.UtcNow,
+                Interactions = new List<LeadInteraction>
+            {
+                new LeadInteraction
+                {
+                    Type = "STATE_CHANGED",
+                    Content = dto.ConversationState,
+                    CreatedAt = DateTime.UtcNow
+                }
+            }
+            };
+
+            lead.Conversations.Add(novaConversa);
+            lead.ConversationState = dto.ConversationState;
+        }
+
+        // ── Stage ─────────────────────────────────────────────────────
         if (dto.Stage is not null)
         {
-            var novoStage = dto.Stage!;
+            var novoStage = dto.Stage;
             var novoStageId = dto.IdStage;
 
             if (lead.CurrentStage != novoStage || lead.CurrentStageId != novoStageId)
             {
-                lead.CurrentStage = novoStage;
-                lead.CurrentStageId = novoStageId;
-
                 lead.StageHistory.Add(new LeadStageHistory
                 {
                     LeadId = lead.Id,
@@ -177,17 +223,55 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                     StageLabel = novoStage,
                     ChangedAt = DateTime.UtcNow
                 });
+
+                // Registra como interação na conversa ativa
+                var conversaAtiva = lead.Conversations.FirstOrDefault(c => c.EndedAt is null);
+                if (conversaAtiva is not null)
+                {
+                    conversaAtiva.Interactions.Add(new LeadInteraction
+                    {
+                        Type = "STAGE_CHANGED",
+                        Content = $"{lead.CurrentStage} → {novoStage}",
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+
+                lead.CurrentStage = novoStage;
+                lead.CurrentStageId = novoStageId;
             }
 
             lead.HasAppointment = PossuiAgendamento(novoStage);
+
+            var tinhaPayment = lead.HasPayment;
             lead.HasPayment = PossuiPagamento(novoStage);
 
-            if (lead.HasPayment && lead.ConvertedAt is null)
+            // ── Pagamento ─────────────────────────────────────────────
+            if (!tinhaPayment && lead.HasPayment)
+            {
                 lead.ConvertedAt = DateTime.UtcNow;
+
+                lead.Payments.Add(new Payment
+                {
+                    LeadId = lead.Id,
+                    Amount = 0, // enriquecer quando tiver esse dado no DTO
+                    PaidAt = DateTime.UtcNow
+                });
+
+                // Registra como interação
+                var conversaAtiva = lead.Conversations.FirstOrDefault(c => c.EndedAt is null);
+                if (conversaAtiva is not null)
+                {
+                    conversaAtiva.Interactions.Add(new LeadInteraction
+                    {
+                        Type = "PAYMENT",
+                        Content = novoStage,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                }
+            }
         }
 
         lead.UpdatedAt = DateTime.UtcNow;
-
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Lead atualizado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
