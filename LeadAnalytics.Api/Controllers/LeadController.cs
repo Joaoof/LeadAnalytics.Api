@@ -20,38 +20,52 @@ public class WebhooksController : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetAllLeads()
+    public async Task<IActionResult> GetAllLeads()
     {
-        var leads = _leadService.TrazerTodosLeads().Result;
+        var leads = await _leadService.TrazerTodosLeads();
         return Ok(leads);
     }
 
     [HttpPost("cloudia")]
-    public async Task<IActionResult> Cloudia([FromBody] CloudiaWebhookDto? dto)
+    public async Task<IActionResult> Cloudia([FromBody] CloudiaWebhookDto dto)
     {
-        // Loga o tipo do evento que chegou
-        if(_logger.IsEnabled(LogLevel.Information))
+        if (!ModelState.IsValid)
         {
-            _logger.LogInformation("Webhook recebido: {Type}", dto.Type);
+            return BadRequest(ModelState);
         }
 
         var result = await _leadService.SaveLeadAsync(dto);
-
-        return Ok(new { result = result.ToString() });
+        return Ok(result);
     }
 
     [HttpGet("consultas")]
     public async Task<IActionResult> GetHasAppoiment(int clinicId)
     {
         var result = await _leadService.VerificarConsultasFechadas(clinicId);
-        return await Task.FromResult<IActionResult>(Ok(result));
+        return Ok(result);
     }
+
 
     [HttpGet("sem-pagamento")]
     public async Task<IActionResult> GetLeadsWithoutPayment(int clinicId)
     {
+
         var result = await _leadService.VerificarEtapaSemPagamento(clinicId);
-        return await Task.FromResult<IActionResult>(Ok(result));
+
+        if(result == 0)
+        {
+            return NotFound(new ProblemDetails
+            {
+                Title = "Nenhuma consulta agendada sem pagamento",
+                Status = 404
+            });
+        }
+
+        return Ok(new
+        {
+            mensagem = "Agendados sem pagamento",
+            result
+        });
     }
 
     [HttpGet("com-pagamento")]
@@ -75,10 +89,17 @@ public class WebhooksController : ControllerBase
         });
     }
 
-    [HttpGet("origens")]
+    [HttpGet("source-final")]
+    public async Task<IActionResult> GetSourceFinally(int clinicId)
+    {
+        var result = await _leadService.VerificarSourceFinal(clinicId);
+        return Ok(result);
+    }
+
+    [HttpGet("origem-cloudia")]
     public async Task<IActionResult> GetOrigens(int clinicId)
     {
-        var result = await _leadService.VerificarOrigemAgrupada(clinicId);
+        var result = await _leadService.VerificarOrigemCloudia(clinicId);
         return Ok(result);
     }
 
@@ -86,6 +107,44 @@ public class WebhooksController : ControllerBase
     public async Task<IActionResult> GetLeadsFinaldeSemana(int clinicId)
     {
         var leads = await _leadService.LeadsFinaldeSemana(clinicId);
-        return Ok(new { quantidade = leads.Count, leads });
+        return Ok(leads);    
+    }
+
+    [HttpGet("etapa-agrupada")]
+    public async Task<IActionResult> GetEtapaAgrupada([FromQuery] int clinicId)
+    {
+        var result = await _leadService.VerificarEtapaAgrupada(clinicId);
+
+        if (clinicId <= 0)
+            return BadRequest("clinicId inválido");
+
+        return Ok(result);
+    }
+
+    [HttpGet("buscar-inicio-fim")]
+    public async Task<IActionResult> GetBuscarInicioFim([FromQuery] int clinicId, [FromQuery] DateTime dataInicio, [FromQuery] DateTime dataFim)
+    {
+        if (clinicId <= 0)
+            return BadRequest("clinicId inválido");
+        if (dataInicio > dataFim)
+            return BadRequest("dataInicio deve ser menor ou igual a dataFim");
+        var result = await _leadService.BuscarInicioEFimMesLeads(clinicId, dataInicio, dataFim);
+        return Ok(result);
+    }
+
+    [HttpGet("consulta-periodos")]
+    public async Task<IActionResult> GetConsultaPeriodos([FromQuery] FiltroLeadsPeriodoDto filtro)
+    {
+        if (filtro.ClinicId <= 0)
+            return BadRequest("clinicId inválido");
+        if (filtro.Ano <= 0)
+            return BadRequest("Ano inválido");
+        if (filtro.Mes.HasValue && (filtro.Mes < 1 || filtro.Mes > 12))
+            return BadRequest("Mês deve ser entre 1 e 12");
+        if (filtro.Dia.HasValue && (filtro.Dia < 1 || filtro.Dia > 31))
+            return BadRequest("Dia deve ser entre 1 e 31");
+
+        var result = await _leadService.ConsultaLeadsPorPeriodoService(filtro);
+        return Ok(result);
     }
 }

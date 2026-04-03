@@ -43,7 +43,7 @@ public class UnitController(UnitService unitService) : ControllerBase
     public async Task<IActionResult> GetQuantityLeadsUnit(int clinicId)
     {
         var units = await _unitService.GetQuantityLeadsUnit(clinicId);
-        if (units.Count == 0)
+        if (units is null)
             return NotFound();
         return Ok(units);
     }

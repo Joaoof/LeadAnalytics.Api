@@ -1,4 +1,5 @@
 ﻿using LeadAnalytics.Api.Data;
+using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,35 +51,18 @@ public class UnitService
             .ToListAsync();
     }
 
-    public async Task<List<Unit>> GetQuantityLeadsUnit(int clinicId)
+    public async Task<IEnumerable<LeadsPorUnidadeDto>> GetQuantityLeadsUnit(int clinicId)
     {
-        // Carrega unidades do clinicId
-        var units = await _db.Units
-            .Where(u => u.ClinicId == clinicId)
+        var resultado = await _db.Leads
+            .Where(l => l.TenantId == clinicId)
+            .GroupBy(l => l.TenantId)
+            .Select(g => new LeadsPorUnidadeDto
+            {
+                UnitId = g.Key,
+                QuantidadeLeads = g.Count()
+            })
             .ToListAsync();
 
-        if (units.Count == 0)
-            return units;
-
-        // Obtém os Ids das unidades carregadas
-        var unitIds = units.Select(u => u.Id).ToList();
-
-        // Carrega leads que pertençam a essas unidades
-        var leads = await _db.Leads
-            .Where(l => l.UnitId != null && unitIds.Contains(l.UnitId.Value))
-            .ToListAsync();
-
-        // Agrupa leads por UnitId e associa a cada unidade
-        var leadsByUnit = leads
-            .GroupBy(l => l.UnitId)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        foreach (var unit in units)
-        {
-            leadsByUnit.TryGetValue(unit.Id, out var list);
-            unit.Leads = list ?? [];
-        }
-
-        return units;
+        return resultado;
     }
 }

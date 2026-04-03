@@ -3,6 +3,7 @@ using System;
 using LeadAnalytics.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LeadAnalytics.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260401215704_AddTableHistoryAndPayment")]
+    partial class AddTableHistoryAndPayment
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -37,11 +40,6 @@ namespace LeadAnalytics.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("Campaign")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Channel")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("ConversationState")
@@ -59,9 +57,6 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<string>("CurrentStage")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<int?>("CurrentStageId")
-                        .HasColumnType("integer");
 
                     b.Property<string>("Email")
                         .HasColumnType("text");
@@ -87,6 +82,9 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<string>("IdFacebookApp")
                         .HasColumnType("text");
 
+                    b.Property<int?>("IdStage")
+                        .HasColumnType("integer");
+
                     b.Property<string>("LastAdId")
                         .HasColumnType("text");
 
@@ -97,12 +95,17 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<string>("Observations")
                         .HasColumnType("text");
 
+                    b.Property<string>("Origin")
+                        .HasColumnType("text");
+
                     b.Property<string>("Phone")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Source")
-                        .IsRequired()
+                    b.Property<string>("SourceFinal")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Stage")
                         .HasColumnType("text");
 
                     b.Property<string>("Status")
@@ -116,7 +119,6 @@ namespace LeadAnalytics.Api.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("TrackingConfidence")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int?>("UnitId")
@@ -137,72 +139,6 @@ namespace LeadAnalytics.Api.Migrations
                     b.ToTable("leads", (string)null);
                 });
 
-            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Channel")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ConversationState")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("EndedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("LeadId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Source")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LeadId");
-
-                    b.ToTable("LeadConversation");
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadInteraction", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Content")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("LeadConversationId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Metadata")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("LeadConversationId");
-
-                    b.ToTable("LeadInteraction");
-                });
-
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadStageHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -217,12 +153,12 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<int>("LeadId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("StageId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("StageLabel")
+                    b.Property<string>("Stage")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<int?>("StageId")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -292,28 +228,6 @@ namespace LeadAnalytics.Api.Migrations
                     b.Navigation("Unit");
                 });
 
-            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
-                {
-                    b.HasOne("LeadAnalytics.Api.Models.Lead", "Lead")
-                        .WithMany("Conversations")
-                        .HasForeignKey("LeadId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Lead");
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadInteraction", b =>
-                {
-                    b.HasOne("LeadAnalytics.Api.Models.LeadConversation", "Conversation")
-                        .WithMany("Interactions")
-                        .HasForeignKey("LeadConversationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Conversation");
-                });
-
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadStageHistory", b =>
                 {
                     b.HasOne("LeadAnalytics.Api.Models.Lead", "Lead")
@@ -338,16 +252,9 @@ namespace LeadAnalytics.Api.Migrations
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
-                    b.Navigation("Conversations");
-
                     b.Navigation("Payments");
 
                     b.Navigation("StageHistory");
-                });
-
-            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
-                {
-                    b.Navigation("Interactions");
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Unit", b =>

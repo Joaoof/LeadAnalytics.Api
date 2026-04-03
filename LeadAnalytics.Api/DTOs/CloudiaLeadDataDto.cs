@@ -18,6 +18,9 @@ public class CloudiaLeadDataDto
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
+    [JsonPropertyName("clinic_id")]
+    public int ClinicId { get; set; }
+
     [JsonPropertyName("name")]
     public string? Name { get; set; }
 
@@ -36,8 +39,8 @@ public class CloudiaLeadDataDto
     [JsonPropertyName("origin")]
     public string? Origin { get; set; }
 
-    [JsonPropertyName("clinic_id")]
-    public int ClinicId { get; set; }
+    [JsonPropertyName("has_health_insurance_plan")]
+    public bool? HasHealthInsurancePlan { get; set; }
 
     [JsonPropertyName("stage")]
     public string? Stage { get; set; }
@@ -48,8 +51,11 @@ public class CloudiaLeadDataDto
     [JsonPropertyName("observations")]
     public string? Observations { get; set; }
 
+    [JsonPropertyName("last_ad_id")]
+    public string? LastAdId { get; set; }
+
     [JsonPropertyName("created_at")]
-    public DateTime CreatedAt { get; set; }
+    public DateTime? CreatedAt { get; set; }
 
     [JsonPropertyName("last_updated_at")]
     public DateTime? LastUpdatedAt { get; set; }
@@ -59,8 +65,22 @@ public class CloudiaLeadDataDto
 
     [JsonPropertyName("tags")]
     public List<CloudiaTagDto>? Tags { get; set; }
-}
 
+    [JsonPropertyName("registered_on_whatsapp")]
+    public int? RegisteredOnWhatsApp { get; set; }
+
+    [JsonPropertyName("id_whatsapp")]
+    public string? IdWhatsApp { get; set; }
+
+    [JsonPropertyName("conversationState")]
+    public string? ConversationState { get; set; }
+
+    [JsonPropertyName("idfacebookapp")]
+    public string? IdFacebookApp { get; set; }
+
+    [JsonPropertyName("id_channel_integration")]
+    public int? IdChannelIntegration { get; set; }
+}
 // Dados do anúncio
 public class CloudiaAdDataDto
 {
