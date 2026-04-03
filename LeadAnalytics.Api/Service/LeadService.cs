@@ -147,6 +147,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.HasHealthInsurancePlan.HasValue) lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
         if (dto.IdChannelIntegration.HasValue) lead.IdChannelIntegration = dto.IdChannelIntegration;
         if (dto.LastAdId is not null) lead.LastAdId = dto.LastAdId;
+        if(dto.ConversationState is not null) lead.ConversationState = dto.ConversationState;
 
         if (dto.Tags is not null)
             lead.Tags = JsonSerializer.Serialize(dto.Tags);
