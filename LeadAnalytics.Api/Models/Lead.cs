@@ -54,6 +54,12 @@ public class Lead
     public ICollection<LeadConversation> Conversations { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
 
+    public int? AttendantId { get; set; }
+    public Attendant? Attendant { get; set; }
+
+    // Histórico de atribuições
+    public List<LeadAssignment> Assignments { get; set; } = new();
+
     // ─── AUDITORIA ───────────────────────────
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

@@ -1,5 +1,6 @@
 using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.Service;
+using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
 
@@ -22,6 +23,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<UnitService>();
+builder.Services.AddScoped<AttendantService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 builder.Services.AddSingleton<IPdfRelatorioService, PdfRelatorioService>();
 

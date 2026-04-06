@@ -6,10 +6,22 @@ public class CloudiaWebhookDto
 {
     [JsonPropertyName("type")]
     public string Type { get; set; } = null!;
-    // Ex: "CUSTOMER_CREATED", "CUSTOMER_UPDATED"
 
     [JsonPropertyName("data")]
-    public CloudiaLeadDataDto Data { get; set; } = null!;
+    public CloudiaLeadDataDto? Data { get; set; }
+
+    // ─── USER_ASSIGNED_TO_CUSTOMER ───────────────
+    [JsonPropertyName("assigned_user_id")]
+    public int? AssignedUserId { get; set; }
+
+    [JsonPropertyName("assigned_user_name")]
+    public string? AssignedUserName { get; set; }
+
+    [JsonPropertyName("assigned_user_email")]
+    public string? AssignedUserEmail { get; set; }
+
+    [JsonPropertyName("customer")]
+    public CloudiaAssignmentCustomerDto? Customer { get; set; }
 }
 
 // Representa os dados do lead dentro do webhook
@@ -109,3 +121,4 @@ public class CloudiaHasAppoimentDto
     [JsonPropertyName("has_appointment")]
     public bool HasAppointment { get; set; }
 }
+

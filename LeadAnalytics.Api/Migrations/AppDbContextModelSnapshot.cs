@@ -22,6 +22,35 @@ namespace LeadAnalytics.Api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("LeadAnalytics.Api.Models.Attendant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<int>("ExternalId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExternalId")
+                        .IsUnique();
+
+                    b.ToTable("attendants", (string)null);
+                });
+
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
                     b.Property<int>("Id")
@@ -35,6 +64,9 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.Property<string>("AdData")
                         .HasColumnType("text");
+
+                    b.Property<int?>("AttendantId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Campaign")
                         .IsRequired()
@@ -127,14 +159,45 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AttendantId");
+
                     b.HasIndex("UnitId");
 
-                    b.HasIndex("Id", "TenantId")
+                    b.HasIndex("ExternalId", "TenantId")
                         .IsUnique();
 
                     b.HasIndex("TenantId", "CreatedAt");
 
                     b.ToTable("leads", (string)null);
+                });
+
+            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadAssignment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("AttendantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Stage")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttendantId");
+
+                    b.HasIndex("LeadId");
+
+                    b.ToTable("lead_assignments", (string)null);
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
@@ -169,7 +232,7 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.HasIndex("LeadId");
 
-                    b.ToTable("LeadConversation");
+                    b.ToTable("lead_conversations", (string)null);
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadInteraction", b =>
@@ -200,7 +263,7 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.HasIndex("LeadConversationId");
 
-                    b.ToTable("LeadInteraction");
+                    b.ToTable("lead_interactions", (string)null);
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadStageHistory", b =>
@@ -228,7 +291,7 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.HasIndex("LeadId");
 
-                    b.ToTable("LeadStageHistory");
+                    b.ToTable("lead_stage_histories", (string)null);
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Payment", b =>
@@ -252,7 +315,7 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.HasIndex("LeadId");
 
-                    b.ToTable("Payment");
+                    b.ToTable("payments", (string)null);
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Unit", b =>
@@ -275,9 +338,7 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClinicId", "CreatedAt");
-
-                    b.HasIndex("Id", "ClinicId")
+                    b.HasIndex("ClinicId")
                         .IsUnique();
 
                     b.ToTable("units", (string)null);
@@ -285,11 +346,36 @@ namespace LeadAnalytics.Api.Migrations
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
+                    b.HasOne("LeadAnalytics.Api.Models.Attendant", "Attendant")
+                        .WithMany()
+                        .HasForeignKey("AttendantId");
+
                     b.HasOne("LeadAnalytics.Api.Models.Unit", "Unit")
                         .WithMany("Leads")
                         .HasForeignKey("UnitId");
 
+                    b.Navigation("Attendant");
+
                     b.Navigation("Unit");
+                });
+
+            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadAssignment", b =>
+                {
+                    b.HasOne("LeadAnalytics.Api.Models.Attendant", "Attendant")
+                        .WithMany("Assignments")
+                        .HasForeignKey("AttendantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LeadAnalytics.Api.Models.Lead", "Lead")
+                        .WithMany("Assignments")
+                        .HasForeignKey("LeadId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Attendant");
+
+                    b.Navigation("Lead");
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
@@ -336,8 +422,15 @@ namespace LeadAnalytics.Api.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("LeadAnalytics.Api.Models.Attendant", b =>
+                {
+                    b.Navigation("Assignments");
+                });
+
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
+                    b.Navigation("Assignments");
+
                     b.Navigation("Conversations");
 
                     b.Navigation("Payments");

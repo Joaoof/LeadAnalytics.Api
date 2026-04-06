@@ -1,16 +1,18 @@
 ﻿using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs;
 using LeadAnalytics.Api.Models;
+using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace LeadAnalytics.Api.Service;
 
-public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitService unitService)
+public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitService unitService, AttendantService attendantService)
 {
     private readonly AppDbContext _db = db;
     private readonly ILogger<LeadService> _logger = logger;
     private readonly UnitService _unitService = unitService;
+    private readonly AttendantService _attendantService = attendantService; // ← adiciona
 
     public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
     {
@@ -19,6 +21,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             "CUSTOMER_CREATED" => await CriarLead(dto.Data),
             "CUSTOMER_UPDATED" => await AtualizarLead(dto.Data),
             "CUSTOMER_TAGS_UPDATED" => await AtualizarTagUsuario(dto),
+            "USER_ASSIGNED_TO_CUSTOMER" => await ProcessarAtribuicao(dto), // ← adiciona
+
             _ => ProcessResult.Ignored
         };
     }
@@ -573,6 +577,49 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return stage is "05_AGENDADO_COM_PAGAMENTO"
             or "09_FECHOU_TRATAMENTO"
             or "10_EM_TRATAMENTO";
+    }
+
+    private async Task<ProcessResult> ProcessarAtribuicao(CloudiaWebhookDto dto)
+    {
+        // 1. Pega os dados do atendente e do lead
+        var externalUserId = dto.AssignedUserId!.Value;
+        var externalLeadId = dto.Customer!.Id;
+        var tenantId = dto.Customer.ClinicId;
+
+        // 2. Busca ou cria o atendente
+        var attendant = await _attendantService.GetOrCreateAsync(
+            externalUserId,
+            dto.AssignedUserName!,
+            dto.AssignedUserEmail);
+
+        // 3. Busca o lead no banco
+        var lead = await _db.Leads.FirstOrDefaultAsync(l =>
+            l.ExternalId == externalLeadId &&
+            l.TenantId == tenantId);
+
+        if (lead is null)
+        {
+            _logger.LogWarning("Lead não encontrado para atribuição: {LeadId}", externalLeadId);
+            return ProcessResult.Ignored;
+        }
+
+        // 4. Atualiza o atendente atual no lead
+        lead.AttendantId = attendant.Id;
+        lead.UpdatedAt = DateTime.UtcNow;
+
+        // 5. Salva o histórico de atribuição
+        _db.LeadAssignments.Add(new LeadAssignment
+        {
+            LeadId = lead.Id,
+            AttendantId = attendant.Id,
+            Stage = dto.Customer.Stage,
+            AssignedAt = DateTime.UtcNow
+        });
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Lead {LeadId} atribuído para {Name}", externalLeadId, dto.AssignedUserName);
+        return ProcessResult.Updated;
     }
 }
 
