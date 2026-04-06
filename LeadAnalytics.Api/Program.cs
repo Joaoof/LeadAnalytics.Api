@@ -4,7 +4,6 @@ using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
 
-// QuestPDF — licença Community (gratuita para projetos open-source e receita < $1M/ano)
 QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -26,6 +25,9 @@ builder.Services.AddScoped<UnitService>();
 builder.Services.AddScoped<AttendantService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 builder.Services.AddSingleton<IPdfRelatorioService, PdfRelatorioService>();
+
+builder.Services.AddHttpClient<MetricsService>();
+builder.Services.AddScoped<MetricsService>();
 
 var app = builder.Build();
    
