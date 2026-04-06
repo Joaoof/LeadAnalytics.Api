@@ -81,7 +81,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             Ad = ad,
             TrackingConfidence = confidence,
 
-            CurrentStage = stageLabel ?? "SEM_ETAPA",
+            CurrentStage = stageLabel ?? "SEM_ETAPA_(TESTE IA)",
             CurrentStageId = stageId,
 
             Status = "new",
@@ -107,7 +107,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 new LeadStageHistory
                 {
                     StageId = stageId ?? 0,
-                    StageLabel = stageLabel,
+                    StageLabel = stageLabel ?? "SEM_ETAPA_(TESTE IA)",
                     ChangedAt = DateTime.UtcNow
                 }
             }
