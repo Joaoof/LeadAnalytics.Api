@@ -81,7 +81,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             Ad = ad,
             TrackingConfidence = confidence,
 
-            CurrentStage = stageLabel,
+            CurrentStage = stageLabel ?? "SEM_ETAPA",
             CurrentStageId = stageId,
 
             Status = "new",
