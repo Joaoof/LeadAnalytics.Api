@@ -20,4 +20,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.1.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include=".github\dependabot.yml" />
+    <None Include=".github\workflows\backup.yml" />
+    <None Include=".github\workflows\ci.yml" />
+  </ItemGroup>
+
 </Project>
