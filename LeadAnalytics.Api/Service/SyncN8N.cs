@@ -58,6 +58,9 @@ public class SyncN8N(AppDbContext db)
                 lead.Tags = JsonSerializer.Serialize(merged);
             }
 
+            if (dto.TenantId != 0)
+                lead.TenantId = dto.TenantId;
+
             if(dto.CreatedAt != null)
                 lead.CreatedAt = dto.CreatedAt.Value;
 
