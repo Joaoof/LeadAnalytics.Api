@@ -26,7 +26,9 @@ public class SyncN8N(AppDbContext db)
                 Name = dto.Name ?? "NOME DESCONHECIDO",
                 Phone = dto.Phone ?? "TELEFONE DESCONHECIDO",
                 CurrentStage = dto.Stage ?? "ESTÁGIO DESCONHECIDO",
-                Tags = JsonSerializer.Serialize(dto.Tags ?? [])
+                Tags = JsonSerializer.Serialize(dto.Tags ?? []),
+                CreatedAt = dto.CreatedAt ?? DateTime.UtcNow,
+                UpdatedAt = dto.UpdatedAt ?? DateTime.UtcNow
             };
 
             _db.Leads.Add(lead);
@@ -55,6 +57,12 @@ public class SyncN8N(AppDbContext db)
 
                 lead.Tags = JsonSerializer.Serialize(merged);
             }
+
+            if(dto.CreatedAt != null)
+                lead.CreatedAt = dto.CreatedAt.Value;
+
+            if (dto.UpdatedAt != null)
+                lead.UpdatedAt = dto.UpdatedAt.Value;
         }
 
         await _db.SaveChangesAsync();
