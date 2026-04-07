@@ -102,15 +102,15 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             UpdatedAt = DateTime.UtcNow,
             ConvertedAt = PossuiPagamento(stageLabel) ? DateTime.UtcNow : null,
 
-            StageHistory = new List<LeadStageHistory>
-            {
+            StageHistory =
+            [
                 new LeadStageHistory
                 {
                     StageId = stageId ?? 0,
                     StageLabel = stageLabel ?? "SEM_ETAPA_(TESTE IA)",
                     ChangedAt = DateTime.UtcNow
                 }
-            }
+            ]
         };
 
         _db.Leads.Add(newLead);
@@ -198,15 +198,15 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 Source = lead.Source,
                 ConversationState = dto.ConversationState,
                 StartedAt = DateTime.UtcNow,
-                Interactions = new List<LeadInteraction>
-            {
+                Interactions =
+            [
                 new LeadInteraction
                 {
                     Type = "STATE_CHANGED",
                     Content = dto.ConversationState,
                     CreatedAt = DateTime.UtcNow
                 }
-            }
+            ]
             };
 
             lead.Conversations.Add(novaConversa);
@@ -231,15 +231,12 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
                 // Registra como interação na conversa ativa
                 var conversaAtiva = lead.Conversations.FirstOrDefault(c => c.EndedAt is null);
-                if (conversaAtiva is not null)
-                {
-                    conversaAtiva.Interactions.Add(new LeadInteraction
+                conversaAtiva?.Interactions.Add(new LeadInteraction
                     {
                         Type = "STAGE_CHANGED",
                         Content = $"{lead.CurrentStage} → {novoStage}",
                         CreatedAt = DateTime.UtcNow
                     });
-                }
 
                 lead.CurrentStage = novoStage;
                 lead.CurrentStageId = novoStageId;
@@ -264,15 +261,12 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
                 // Registra como interação
                 var conversaAtiva = lead.Conversations.FirstOrDefault(c => c.EndedAt is null);
-                if (conversaAtiva is not null)
-                {
-                    conversaAtiva.Interactions.Add(new LeadInteraction
+                conversaAtiva?.Interactions.Add(new LeadInteraction
                     {
                         Type = "PAYMENT",
                         Content = novoStage,
                         CreatedAt = DateTime.UtcNow
                     });
-                }
             }
         }
 
@@ -285,12 +279,12 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
     public async Task<ProcessResult> AtualizarTagUsuario(CloudiaWebhookDto dto)
     {
-        var externalId = dto.Data.Id;
-        var tenantId = dto.Data.ClinicId;
+        var externalId = dto?.Data?.Id;
+        var tenantId = dto?.Data?.ClinicId;
 
         _logger.LogInformation("Tags recebidas para {ExternalId}: {Tags}",
             externalId,
-            JsonSerializer.Serialize(dto.Data.Tags));
+            JsonSerializer.Serialize(dto?.Data?.Tags));
 
         var lead = await _db.Leads
             .FirstOrDefaultAsync(l =>
@@ -303,7 +297,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             return ProcessResult.Ignored;
         }
 
-        if (dto.Data.Tags is not null)
+        if (dto?.Data?.Tags is not null)
             lead.Tags = JsonSerializer.Serialize(dto.Data.Tags);
 
         lead.UpdatedAt = DateTime.UtcNow;
@@ -399,7 +393,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .Where(l => l.TenantId == clinicId)
             .ToListAsync();
 
-        return leads.Where(l =>
+        return [.. leads.Where(l =>
         {
             var local = TimeZoneInfo.ConvertTimeFromUtc(l.CreatedAt, brazilTz);
             return local.DayOfWeek switch
@@ -409,7 +403,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 DayOfWeek.Monday => local.Hour < 18,
                 _ => false
             };
-        }).ToList();
+        })];
     }
 
     public async Task<IEnumerable<Lead>> LeadsComCampanha(int clinicId)
@@ -446,7 +440,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 l.CreatedAt < dataFinalUtc)
             .ToListAsync();
 
-        return leads
+        return [.. leads
             .GroupBy(l => new { l.CreatedAt.Year, l.CreatedAt.Month })
             .Select(g => new LeadsMesDto
             {
@@ -455,8 +449,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 Quantidade = g.Count()
             })
             .OrderBy(x => x.Ano)
-            .ThenBy(x => x.Mes)
-            .ToList();
+            .ThenBy(x => x.Mes)];
     }
 
     public async Task<IEnumerable<LeadsMesDto>> ConsultaLeadsPorPeriodoService(FiltroLeadsPeriodoDto filtro)
