@@ -28,6 +28,7 @@ builder.Services.AddSingleton<IPdfRelatorioService, PdfRelatorioService>();
 
 builder.Services.AddHttpClient<MetricsService>();
 builder.Services.AddScoped<MetricsService>();
+builder.Services.AddScoped<SyncN8N>();
 
 var app = builder.Build();
    
