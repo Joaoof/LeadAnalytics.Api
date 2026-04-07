@@ -9,6 +9,7 @@ public class SyncLeadController(SyncN8N syncN8N) : ControllerBase
 {
     private readonly SyncN8N _syncN8N = syncN8N;
 
+    [HttpPost("sync")]
     public async Task<IActionResult> SyncLead([FromBody] DTOs.SyncLeadDto leadData)
     {
         await _syncN8N.SyncLead(leadData);
