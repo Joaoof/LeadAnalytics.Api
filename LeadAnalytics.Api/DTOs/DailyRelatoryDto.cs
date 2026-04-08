@@ -7,5 +7,5 @@ public class DailyRelatoryDto
     public int TotalLeads { get; set; }
     public int Agendamentos { get; set; }
     public int ComPagamento { get; set; }
-    public List<string> Unidades { get; set; } = new();
+    public List<string> Unidades { get; set; } = [];
 }
