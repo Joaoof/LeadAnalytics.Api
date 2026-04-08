@@ -3,10 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-
     public DbSet<Lead> Leads { get; set; }
     public DbSet<Unit> Units { get; set; }
     public DbSet<Attendant> Attendants { get; set; }

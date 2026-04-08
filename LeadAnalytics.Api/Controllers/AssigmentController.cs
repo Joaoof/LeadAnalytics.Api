@@ -5,18 +5,12 @@ namespace LeadAnalytics.Api.Controllers;
 
 [ApiController]
 [Route("assignments")]
-public class AssignmentController : ControllerBase
+public class AssignmentController(
+    AttendantService attendantService,
+    ILogger<AssignmentController> logger) : ControllerBase
 {
-    private readonly AttendantService _attendantService;
-    private readonly ILogger<AssignmentController> _logger;
-
-    public AssignmentController(
-        AttendantService attendantService,
-        ILogger<AssignmentController> logger)
-    {
-        _attendantService = attendantService;
-        _logger = logger;
-    }
+    private readonly AttendantService _attendantService = attendantService;
+    private readonly ILogger<AssignmentController> _logger = logger;
 
     [HttpGet("attendants")]
     public async Task<IActionResult> GetAllAttendants()

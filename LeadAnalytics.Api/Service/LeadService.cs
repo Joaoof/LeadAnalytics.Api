@@ -18,34 +18,34 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     {
         return dto.Type switch
         {
-            "CUSTOMER_CREATED" => await CriarLead(dto.Data),
-            "CUSTOMER_UPDATED" => await AtualizarLead(dto.Data),
-            "CUSTOMER_TAGS_UPDATED" => await AtualizarTagUsuario(dto),
-            "USER_ASSIGNED_TO_CUSTOMER" => await ProcessarAtribuicao(dto), // ← adiciona
+            "CUSTOMER_CREATED" => await CreateLeadAsync(dto.Data),
+            "CUSTOMER_UPDATED" => await UpdateLeadAsync(dto.Data),
+            "CUSTOMER_TAGS_UPDATED" => await UpdateUserTagAsync(dto),
+            "USER_ASSIGNED_TO_CUSTOMER" => await GetProcessAssignment(dto), // ← adiciona
 
             _ => ProcessResult.Ignored
         };
     }
 
-    public async Task<List<Lead>> TrazerTodosLeads()
+    public async Task<List<Lead>> GetAllLeadsAsync()
     {
         return await _db.Leads
             .AsNoTracking()
             .ToListAsync();
     }
 
-    private async Task<ProcessResult> CriarLead(CloudiaLeadDataDto dto)
+    private async Task<ProcessResult> CreateLeadAsync(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
 
-        var leadExistente = await _db.Leads
+        var existingLead = await _db.Leads
             .Include(l => l.StageHistory)
             .FirstOrDefaultAsync(l =>
                 l.ExternalId == externalId &&
                 l.TenantId == tenantId);
 
-        if (leadExistente is not null)
+        if (existingLead is not null)
         {
             _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
             return ProcessResult.Ignored;
@@ -85,8 +85,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             CurrentStageId = stageId,
 
             Status = "new",
-            HasAppointment = PossuiAgendamento(stageLabel),
-            HasPayment = PossuiPagamento(stageLabel),
+            HasAppointment = GetAppointmentAvailable(stageLabel),
+            HasPayment = GetHasPayment(stageLabel),
 
             Tags = dto.Tags is not null
                   ? JsonSerializer.Serialize(dto.Tags)
@@ -100,7 +100,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
-            ConvertedAt = PossuiPagamento(stageLabel) ? DateTime.UtcNow : null,
+            ConvertedAt = GetHasPayment(stageLabel) ? DateTime.UtcNow : null,
 
             StageHistory =
             [
@@ -120,7 +120,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Created;
     }
 
-    private async Task<ProcessResult> AtualizarLead(CloudiaLeadDataDto dto)
+    private async Task<ProcessResult> UpdateLeadAsync(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
@@ -242,10 +242,10 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 lead.CurrentStageId = novoStageId;
             }
 
-            lead.HasAppointment = PossuiAgendamento(novoStage);
+            lead.HasAppointment = GetAppointmentAvailable(novoStage);
 
             var tinhaPayment = lead.HasPayment;
-            lead.HasPayment = PossuiPagamento(novoStage);
+            lead.HasPayment = GetHasPayment(novoStage);
 
             // ── Pagamento ─────────────────────────────────────────────
             if (!tinhaPayment && lead.HasPayment)
@@ -277,7 +277,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    public async Task<ProcessResult> AtualizarTagUsuario(CloudiaWebhookDto dto)
+    public async Task<ProcessResult> UpdateUserTagAsync(CloudiaWebhookDto dto)
     {
         var externalId = dto?.Data?.Id;
         var tenantId = dto?.Data?.ClinicId;
@@ -308,7 +308,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return ProcessResult.Updated;
     }
 
-    public async Task<int> VerificarConsultasFechadas(int clinicId)
+    public async Task<int> GetCheckClosedQueries(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -320,7 +320,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .CountAsync();
     }
 
-    public async Task<int> VerificarEtapaSemPagamento(int clinicId)
+    public async Task<int> GetCheckStageWithoutPayment(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -330,7 +330,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .CountAsync();
     }
 
-    public async Task<int> VerificarEtapaComPagamento(int clinicId)
+    public async Task<int> GetVerifyPaymentStep(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -340,7 +340,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .CountAsync();
     }
 
-    public async Task<List<object>> VerificarSourceFinal(int clinicId)
+    public async Task<List<object>> GetVerifySourceFinal(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -354,7 +354,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync<object>();
     }
 
-    public async Task<List<OrigemAgrupadaDto>> VerificarOrigemCloudia(int clinicId)
+    public async Task<List<OrigemAgrupadaDto>> GetCheckSourceCloudia(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -368,7 +368,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync();
     }
 
-    public async Task<List<EtapaAgrupadaDto>> VerificarEtapaAgrupada(int clinicId)
+    public async Task<List<EtapaAgrupadaDto>> GetCheckGroupedStep(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -384,7 +384,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Lead>> LeadsFinaldeSemana(int clinicId)
+    public async Task<IEnumerable<Lead>> GetWeekendLeads(int clinicId)
     {
         var brazilTz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
@@ -406,7 +406,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         })];
     }
 
-    public async Task<IEnumerable<Lead>> LeadsComCampanha(int clinicId)
+    public async Task<IEnumerable<Lead>> GetCampaignLeads(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -414,7 +414,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync();
     }
 
-    public async Task<List<Lead>> LeadsComAd(int clinicId)
+    public async Task<List<Lead>> GetLeadAds(int clinicId)
     {
         return await _db.Leads
             .AsNoTracking()
@@ -422,7 +422,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<LeadsMesDto>> BuscarInicioEFimMesLeads(int clinicId, DateTime dataInicio, DateTime finalData)
+    public async Task<IEnumerable<LeadsMesDto>> GetSearchStartMonthLeads(int clinicId, DateTime dataInicio, DateTime finalData)
     {
         var tz = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
@@ -452,7 +452,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             .ThenBy(x => x.Mes)];
     }
 
-    public async Task<IEnumerable<LeadsMesDto>> ConsultaLeadsPorPeriodoService(FiltroLeadsPeriodoDto filtro)
+    public async Task<IEnumerable<LeadsMesDto>> GetQueryLeadsByPeriodService(FiltroLeadsPeriodoDto filtro)
     {
         var leadsQuery = _db.Leads
             .AsNoTracking()
@@ -551,7 +551,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return "DESCONHECIDO";
     }
 
-    private static bool PossuiAgendamento(string? stage)
+    private static bool GetAppointmentAvailable(string? stage)
     {
         if (string.IsNullOrWhiteSpace(stage))
             return false;
@@ -562,7 +562,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             or "10_EM_TRATAMENTO";
     }
 
-    private static bool PossuiPagamento(string? stage)
+    private static bool GetHasPayment(string? stage)
     {
         if (string.IsNullOrWhiteSpace(stage))
             return false;
@@ -572,7 +572,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             or "10_EM_TRATAMENTO";
     }
 
-    private async Task<ProcessResult> ProcessarAtribuicao(CloudiaWebhookDto dto)
+    private async Task<ProcessResult> GetProcessAssignment(CloudiaWebhookDto dto)
     {
         // 1. Pega os dados do atendente e do lead
         var externalUserId = dto.AssignedUserId!.Value;

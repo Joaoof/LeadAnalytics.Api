@@ -6,18 +6,12 @@ namespace LeadAnalytics.Api.Controllers;
 
 [ApiController]
 [Route("webhooks")]
-public class WebhooksController : ControllerBase
+public class WebhooksController(
+    LeadService leadService,
+    ILogger<WebhooksController> logger) : ControllerBase
 {
-    private readonly LeadService _leadService;
-    private readonly ILogger<WebhooksController> _logger;
-
-    public WebhooksController(
-        LeadService leadService,
-        ILogger<WebhooksController> logger)
-    {
-        _leadService = leadService;
-        _logger = logger;
-    }
+    private readonly LeadService _leadService = leadService;
+    private readonly ILogger<WebhooksController> _logger = logger;
 
     [HttpGet]
     public async Task<IActionResult> GetAllLeads()

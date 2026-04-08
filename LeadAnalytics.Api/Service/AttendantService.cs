@@ -4,16 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Services;
 
-public class AttendantService
+public class AttendantService(AppDbContext db, ILogger<AttendantService> logger)
 {
-    private readonly AppDbContext _db;
-    private readonly ILogger<AttendantService> _logger;
-
-    public AttendantService(AppDbContext db, ILogger<AttendantService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly AppDbContext _db = db;
+    private readonly ILogger<AttendantService> _logger = logger;
 
     public async Task<Attendant> GetOrCreateAsync(int externalId, string name, string? email)
     {

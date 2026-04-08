@@ -5,21 +5,14 @@ using System.Text.Json;
 
 namespace LeadAnalytics.Api.Services;
 
-public class MetricsService
+public class MetricsService(
+    HttpClient httpClient,
+    ILogger<MetricsService> logger,
+    IConfiguration config)
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<MetricsService> _logger;
-    private readonly IConfiguration _config;
-
-    public MetricsService(
-        HttpClient httpClient,
-        ILogger<MetricsService> logger,
-        IConfiguration config)
-    {
-        _httpClient = httpClient;
-        _logger = logger;
-        _config = config;
-    }
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly ILogger<MetricsService> _logger = logger;
+    private readonly IConfiguration _config = config;
 
     public async Task<CloudiaMetricsResponseDto?> GetDashboardAsync(
         int clinicId,

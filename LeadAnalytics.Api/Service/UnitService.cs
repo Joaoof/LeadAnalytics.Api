@@ -5,16 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Service;
 
-public class UnitService
+public class UnitService(AppDbContext db, ILogger<UnitService> logger)
 {
-    private readonly AppDbContext _db;
-    private readonly ILogger<UnitService> _logger;
-
-    public UnitService(AppDbContext db, ILogger<UnitService> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    private readonly AppDbContext _db = db;
+    private readonly ILogger<UnitService> _logger = logger;
 
     public async Task<Unit> GetOrCreateAsync(int clinicId)
     {

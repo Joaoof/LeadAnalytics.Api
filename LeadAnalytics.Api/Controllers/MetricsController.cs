@@ -6,18 +6,12 @@ namespace LeadAnalytics.Api.Controllers;
 
 [ApiController]
 [Route("metrics")]
-public class MetricsController : ControllerBase
+public class MetricsController(
+    MetricsService metricsService,
+    ILogger<MetricsController> logger) : ControllerBase
 {
-    private readonly MetricsService _metricsService;
-    private readonly ILogger<MetricsController> _logger;
-
-    public MetricsController(
-        MetricsService metricsService,
-        ILogger<MetricsController> logger)
-    {
-        _metricsService = metricsService;
-        _logger = logger;
-    }
+    private readonly MetricsService _metricsService = metricsService;
+    private readonly ILogger<MetricsController> _logger = logger;
 
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard(
