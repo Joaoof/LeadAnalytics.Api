@@ -566,7 +566,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     {
         if (string.IsNullOrWhiteSpace(stage))
             return false;
-
+            
         return stage is "05_AGENDADO_COM_PAGAMENTO"
             or "09_FECHOU_TRATAMENTO"
             or "10_EM_TRATAMENTO";

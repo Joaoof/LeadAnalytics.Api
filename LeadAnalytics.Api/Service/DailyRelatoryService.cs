@@ -33,13 +33,25 @@ public class DailyRelatoryService(AppDbContext db)
                 Atendente = g.Key.Name,
                 Telefone = g.Key.Phone,
                 TotalLeads = g.Count(),
-                Agendamentos = g.Count(a => a.Lead.HasAppointment),
-                ComPagamento = g.Count(a => a.Lead.HasPayment),
+                Agendamentos = g.Count(a => PossuiAgendamento(a.Lead.CurrentStage)),
+                ComPagamento = g.Count(a => PossuiPagamento(a.Lead.CurrentStage)),
                 Unidades = [.. g
                     .Where(a => a.Lead.Unit != null)
                     .Select(a => a.Lead.Unit!.Name)
                     .Distinct()]
             })
             .OrderByDescending(x => x.TotalLeads)];
+    }
+
+    private static bool PossuiPagamento(string? stage)
+    {
+        return stage == "10_EM_TRATAMENTO"
+            || stage == "09_FECHOU_TRATAMENTO";
+    }
+
+    private static bool PossuiAgendamento(string? stage)
+    {
+        return stage == "07_AGENDADO"
+            || stage == "08_CONFIRMADO";
     }
 }
