@@ -35,6 +35,9 @@ public class DailyRelatoryService(AppDbContext db)
                 TotalLeads = g.Count(),
                 Agendamentos = g.Count(a => PossuiAgendamento(a.Lead.CurrentStage)),
                 ComPagamento = g.Count(a => PossuiPagamento(a.Lead.CurrentStage)),
+                Observacoes = string.Join(" | ", g
+                .Where(a => a.Lead.Observations != null)
+                .Select(a => a.Lead.Observations)),
                 Unidades = [.. g
                     .Where(a => a.Lead.Unit != null)
                     .Select(a => a.Lead.Unit!.Name)
