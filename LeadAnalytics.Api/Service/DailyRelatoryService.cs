@@ -59,6 +59,6 @@ public class DailyRelatoryService(AppDbContext db)
     }
     private static bool PossuiResgate(string? tags)
     {
-        return tags != null && tags.Contains("RESGATE");
+        return tags != null && tags.Contains("resgate-lead");
     }
 }
