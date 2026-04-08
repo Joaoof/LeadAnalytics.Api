@@ -4,8 +4,9 @@ namespace LeadAnalytics.Api.DTOs;
 
 public class SyncLeadDto
 {
-    [JsonPropertyName("customer")]
+    [JsonPropertyName("externalId")]
     public int ExternalId { get; set; }
+
     [JsonPropertyName("tags")]
     public List<string> Tags { get; set; } = [];
 
@@ -15,15 +16,15 @@ public class SyncLeadDto
     [JsonPropertyName("phone")]
     public string? Phone { get; set; }
 
-    [JsonPropertyName("stage_label")]
+    [JsonPropertyName("stage")]
     public string? Stage { get; set; }
 
-    [JsonPropertyName("idclinic")]
+    [JsonPropertyName("tenantId")]
     public int TenantId { get; set; }
 
-    [JsonPropertyName("created_at")]
+    [JsonPropertyName("createdAt")]
     public DateTime? CreatedAt { get; set; }
 
-    [JsonPropertyName("updated_at")]
+    [JsonPropertyName("updatedAt")]
     public DateTime? UpdatedAt { get; set; }
 }
