@@ -3,7 +3,7 @@
 public class Attendant
 {
     public int Id { get; set; }
-    0public int ExternalId { get; set; }
+    public int ExternalId { get; set; }
     public string Name { get; set; } = null!;
     public string? Email { get; set; }
     public string? Phone { get; set; } // ← adiciona
