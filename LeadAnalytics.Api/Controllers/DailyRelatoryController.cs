@@ -17,7 +17,7 @@ public class DailyRelatoryController(DailyRelatoryService dailyRelatoryService) 
             return BadRequest(ModelState);
         }
 
-        await _dailyRelatoryService.GenerateDailyRelatory(tenantId, date);
-        return Ok("Relatório diário gerado com sucesso.");
+        var relatorio = await _dailyRelatoryService.GenerateDailyRelatory(tenantId, date);
+        return Ok(relatorio);
     }
 }
