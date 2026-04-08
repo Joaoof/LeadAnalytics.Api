@@ -16,7 +16,7 @@ public class WebhooksController(
     [HttpGet]
     public async Task<IActionResult> GetAllLeads()
     {
-        var leads = await _leadService.TrazerTodosLeads();
+        var leads = await _leadService.GetAllLeadsAsync();
         return Ok(leads);
     }
 
@@ -35,7 +35,7 @@ public class WebhooksController(
     [HttpGet("consultas")]
     public async Task<IActionResult> GetHasAppoiment(int clinicId)
     {
-        var result = await _leadService.VerificarConsultasFechadas(clinicId);
+        var result = await _leadService.GetCheckClosedQueries(clinicId);
         return Ok(result);
     }
 
@@ -44,7 +44,7 @@ public class WebhooksController(
     public async Task<IActionResult> GetLeadsWithoutPayment(int clinicId)
     {
 
-        var result = await _leadService.VerificarEtapaSemPagamento(clinicId);
+        var result = await _leadService.GetCheckStageWithoutPayment(clinicId);
 
         if(result == 0)
         {
@@ -65,7 +65,7 @@ public class WebhooksController(
     [HttpGet("com-pagamento")]
     public async Task<IActionResult> VerificarEtapaComPagamento(int clinicId)
     {
-        var quantidade = await _leadService.VerificarEtapaComPagamento(clinicId);
+        var quantidade = await _leadService.GetVerifyPaymentStep(clinicId);
 
         if (quantidade == 0)
         {
@@ -86,28 +86,28 @@ public class WebhooksController(
     [HttpGet("source-final")]
     public async Task<IActionResult> GetSourceFinally(int clinicId)
     {
-        var result = await _leadService.VerificarSourceFinal(clinicId);
+        var result = await _leadService.GetVerifySourceFinal(clinicId);
         return Ok(result);
     }
 
     [HttpGet("origem-cloudia")]
     public async Task<IActionResult> GetOrigens(int clinicId)
     {
-        var result = await _leadService.VerificarOrigemCloudia(clinicId);
+        var result = await _leadService.GetCheckSourceCloudia(clinicId);
         return Ok(result);
     }
 
     [HttpGet("fim-de-semana")]
     public async Task<IActionResult> GetLeadsFinaldeSemana(int clinicId)
     {
-        var leads = await _leadService.LeadsFinaldeSemana(clinicId);
+        var leads = await _leadService.GetWeekendLeads(clinicId);
         return Ok(leads);    
     }
 
     [HttpGet("etapa-agrupada")]
     public async Task<IActionResult> GetEtapaAgrupada([FromQuery] int clinicId)
     {
-        var result = await _leadService.VerificarEtapaAgrupada(clinicId);
+        var result = await _leadService.GetCheckGroupedStep(clinicId);
 
         if (clinicId <= 0)
             return BadRequest("clinicId inválido");
@@ -122,7 +122,7 @@ public class WebhooksController(
             return BadRequest("clinicId inválido");
         if (dataInicio > dataFim)
             return BadRequest("dataInicio deve ser menor ou igual a dataFim");
-        var result = await _leadService.BuscarInicioEFimMesLeads(clinicId, dataInicio, dataFim);
+        var result = await _leadService.GetSearchStartMonthLeads(clinicId, dataInicio, dataFim);
         return Ok(result);
     }
 
@@ -138,7 +138,7 @@ public class WebhooksController(
         if (filtro.Dia.HasValue && (filtro.Dia < 1 || filtro.Dia > 31))
             return BadRequest("Dia deve ser entre 1 e 31");
 
-        var result = await _leadService.ConsultaLeadsPorPeriodoService(filtro);
+        var result = await _leadService.GetQueryLeadsByPeriodService(filtro);
         return Ok(result);
     }
 }
