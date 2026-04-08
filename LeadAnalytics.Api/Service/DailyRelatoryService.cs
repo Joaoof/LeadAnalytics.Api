@@ -51,7 +51,7 @@ public class DailyRelatoryService(AppDbContext db)
 
     private static bool PossuiAgendamento(string? stage)
     {
-        return stage == "07_AGENDADO"
-            || stage == "08_CONFIRMADO";
+        return stage == "04_AGENDADO_SEM_PAGAMENTO"
+            || stage == "05_AGENDADO_COM_PAGAMENTO";
     }
 }
