@@ -17,55 +17,33 @@ public class SyncN8N(AppDbContext db)
                 l.ExternalId == dto.ExternalId &&
                 l.TenantId == dto.TenantId);
 
-        if (lead == null)
+        if (lead is null)
         {
-            lead = new Lead
+            // Cria o lead
+            _db.Leads.Add(new Lead
             {
                 ExternalId = dto.ExternalId,
                 TenantId = dto.TenantId,
-                Name = dto.Name ?? "NOME DESCONHECIDO",
-                Phone = dto.Phone ?? "TELEFONE DESCONHECIDO",
-                CurrentStage = dto.Stage ?? "ESTÁGIO DESCONHECIDO",
-                Tags = JsonSerializer.Serialize(dto.Tags ?? []),
+                Name = dto.Name ?? "Sem nome",
+                Phone = dto.Phone ?? "Sem telefone",
+                CurrentStage = dto.Stage ?? "SEM_ETAPA",
+                Tags = JsonSerializer.Serialize(dto.Tags),
                 CreatedAt = dto.CreatedAt ?? DateTime.UtcNow,
                 UpdatedAt = dto.UpdatedAt ?? DateTime.UtcNow
-            };
-
-            _db.Leads.Add(lead);
+            });
         }
         else
         {
-            if (dto.Name != null)
-                lead.Name = dto.Name;
+            // Atualiza o lead
+            if (dto.Name is not null) lead.Name = dto.Name;
+            if (dto.Phone is not null) lead.Phone = dto.Phone;
+            if (dto.Stage is not null) lead.CurrentStage = dto.Stage;
 
-            if (dto.Phone != null)
-                lead.Phone = dto.Phone;
+            // Tags — substitui direto, sem tentar mesclar
+            if (dto.Tags is not null && dto.Tags.Count > 0)
+                lead.Tags = JsonSerializer.Serialize(dto.Tags);
 
-            if (dto.Stage != null)
-                lead.CurrentStage = dto.Stage;
-
-            if (dto.Tags != null && dto.Tags.Count > 0)
-            {
-                var existingTags = string.IsNullOrEmpty(lead.Tags)
-                    ? []
-                    : JsonSerializer.Deserialize<List<string>>(lead.Tags)!;
-
-                var merged = existingTags
-                    .Union(dto.Tags)
-                    .Distinct()
-                    .ToList();
-
-                lead.Tags = JsonSerializer.Serialize(merged);
-            }
-
-            if (dto.TenantId != 0)
-                lead.TenantId = dto.TenantId;
-
-            if(dto.CreatedAt != null)
-                lead.CreatedAt = dto.CreatedAt.Value;
-
-            if (dto.UpdatedAt != null)
-                lead.UpdatedAt = dto.UpdatedAt.Value;
+            lead.UpdatedAt = DateTime.UtcNow;
         }
 
         await _db.SaveChangesAsync();
