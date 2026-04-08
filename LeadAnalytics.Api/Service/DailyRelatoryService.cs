@@ -35,6 +35,7 @@ public class DailyRelatoryService(AppDbContext db)
                 TotalLeads = g.Count(),
                 Agendamentos = g.Count(a => PossuiAgendamento(a.Lead.CurrentStage)),
                 ComPagamento = g.Count(a => PossuiPagamento(a.Lead.CurrentStage)),
+                Resgastes = g.Count(a => PossuiResgate(a.Lead.Tags)),
                 Observacoes = string.Join(" | ", g
                 .Where(a => a.Lead.Observations != null)
                 .Select(a => a.Lead.Observations)),
@@ -51,10 +52,13 @@ public class DailyRelatoryService(AppDbContext db)
         return stage == "10_EM_TRATAMENTO"
             || stage == "09_FECHOU_TRATAMENTO";
     }
-
     private static bool PossuiAgendamento(string? stage)
     {
         return stage == "04_AGENDADO_SEM_PAGAMENTO"
             || stage == "05_AGENDADO_COM_PAGAMENTO";
+    }
+    private static bool PossuiResgate(string? tags)
+    {
+        return tags != null && tags.Contains("RESGATE");
     }
 }
