@@ -1,6 +1,5 @@
 using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.Service;
-using LeadAnalytics.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using QuestPDF.Infrastructure;
 

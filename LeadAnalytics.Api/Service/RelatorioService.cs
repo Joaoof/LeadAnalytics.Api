@@ -58,7 +58,7 @@ public class RelatorioService(AppDbContext db, IPdfRelatorioService pdfService) 
                 .Where(u => u.ClinicId == clinicId && unitIds.Contains(u.Id))
                 .Select(u => new { u.Id, u.Name })
                 .ToDictionaryAsync(x => x.Id, x => x.Name, ct)
-            : new Dictionary<int, string>();
+            : [];
 
         // Se não houver entidade Tenant/Clinic consolidada, usa fallback
         var nomeClinica = unidadesMap.Values.FirstOrDefault() ?? $"Clínica #{clinicId}";

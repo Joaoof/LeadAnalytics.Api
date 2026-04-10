@@ -2,7 +2,7 @@
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace LeadAnalytics.Api.Services;
+namespace LeadAnalytics.Api.Service;
 
 public class AttendantService(AppDbContext db, ILogger<AttendantService> logger)
 {

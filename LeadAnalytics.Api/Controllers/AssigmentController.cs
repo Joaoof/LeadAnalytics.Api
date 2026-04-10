@@ -1,4 +1,4 @@
-﻿using LeadAnalytics.Api.Services;
+﻿using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LeadAnalytics.Api.Controllers;

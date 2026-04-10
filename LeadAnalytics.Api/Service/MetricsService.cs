@@ -3,7 +3,7 @@ using LeadAnalytics.Api.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
-namespace LeadAnalytics.Api.Services;
+namespace LeadAnalytics.Api.Service;
 
 public class MetricsService(
     HttpClient httpClient,

@@ -24,6 +24,7 @@
     <None Include=".github\dependabot.yml" />
     <None Include=".github\workflows\backup.yml" />
     <None Include=".github\workflows\ci.yml" />
+    <None Include="DTOs\CreateOriginEventDto.cs" />
   </ItemGroup>
 
 </Project>
