@@ -90,7 +90,7 @@ public class LeadService(
 
         // ✅ PHONE PODE SER NULL (será atualizado depois)
         var phone = dto.Phone;
-        var normalizedPhone = LeadAttributionService.NormalizePhone(phone);
+             //LeadAttributionService.NormalizePhone(phone);
 
         var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
         var stageLabel = dto.Stage;
@@ -100,7 +100,7 @@ public class LeadService(
         OriginEvent? originEvent = null;
         if (dto.Phone is not null)
         {
-            originEvent = await _attributionService.FindBestOriginEventAsync(normalizedPhone, tenantId);
+            originEvent = await _attributionService.FindBestOriginEventAsync(phone, tenantId);
         }
 
         string source, campaign, confidence;
@@ -214,7 +214,7 @@ public class LeadService(
             await _attributionService.CreateAttributionAsync(
                 newLead.Id,
                 originEvent,
-                normalizedPhone,
+                phone,
                 tenantId);
         }
 
