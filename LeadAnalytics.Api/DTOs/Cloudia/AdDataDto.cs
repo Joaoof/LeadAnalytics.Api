@@ -9,5 +9,5 @@ public class AdDataDto
     [JsonPropertyName("ad_name")]
     public string AdName { get; set; }
     [JsonPropertyName("source")]
-    public string source { get; set; }
+    public string Source { get; set; }
 }

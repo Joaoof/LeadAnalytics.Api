@@ -682,8 +682,8 @@ public class LeadService(
                     ? dto.Origin.Trim().ToUpperInvariant()
                     : "DESCONHECIDO");
 
-            var campaign = !string.IsNullOrWhiteSpace(item.AdId)
-                ? item.AdId.Trim()
+            var campaign = !string.IsNullOrWhiteSpace(item.Id)
+                ? item.Id.Trim()
                 : "DESCONHECIDO";
 
             var ad = !string.IsNullOrWhiteSpace(item.AdName)
