@@ -44,7 +44,6 @@ public class Lead
 
     // ─── RAW DATA (NÃO CONFIÁVEL) ────────────
     public string? Tags { get; set; }
-    public string? AdData { get; set; }
 
     // ─── RELACIONAMENTOS ─────────────────────
     public int? UnitId { get; set; }

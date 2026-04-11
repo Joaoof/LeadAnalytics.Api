@@ -29,9 +29,10 @@ builder.Services.AddHttpClient<MetricsService>();
 builder.Services.AddScoped<MetricsService>();
 builder.Services.AddScoped<SyncN8N>();
 builder.Services.AddScoped<DailyRelatoryService>();
+builder.Services.AddScoped<LeadAttributionService>(); // 🔥 NOVO
 
 var app = builder.Build();
-   
+
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {

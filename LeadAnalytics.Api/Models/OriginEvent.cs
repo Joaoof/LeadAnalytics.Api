@@ -13,7 +13,6 @@ public class OriginEvent
     [MaxLength(255)]
     public string? ContactName { get; set; }
 
-    [Required]
     [MaxLength(255)]
     public string CtwaClid { get; set; } = null!;
 
@@ -42,4 +41,6 @@ public class OriginEvent
     public int? TenantId { get; set; }
     public int? WebhookEventId { get; set; }
     public WebhookEvent? WebhookEvent { get; set; }
+    public string Confidence { get; set; } = "LOW"; // HIGH | MEDIUM | LOW
+
 }

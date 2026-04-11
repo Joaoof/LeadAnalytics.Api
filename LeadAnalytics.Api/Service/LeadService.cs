@@ -6,12 +6,18 @@ using System.Text.Json;
 
 namespace LeadAnalytics.Api.Service;
 
-public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitService unitService, AttendantService attendantService)
+public class LeadService(
+    AppDbContext db,
+    ILogger<LeadService> logger,
+    UnitService unitService,
+    AttendantService attendantService,
+    LeadAttributionService attributionService)
 {
     private readonly AppDbContext _db = db;
     private readonly ILogger<LeadService> _logger = logger;
     private readonly UnitService _unitService = unitService;
-    private readonly AttendantService _attendantService = attendantService; // ← adiciona
+    private readonly AttendantService _attendantService = attendantService;
+    private readonly LeadAttributionService _attributionService = attributionService;
 
     public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
     {
@@ -20,8 +26,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             "CUSTOMER_CREATED" => await CreateLeadAsync(dto.Data),
             "CUSTOMER_UPDATED" => await UpdateLeadAsync(dto.Data),
             "CUSTOMER_TAGS_UPDATED" => await UpdateUserTagAsync(dto),
-            "USER_ASSIGNED_TO_CUSTOMER" => await GetProcessAssignment(dto), // ← adiciona
-
+            "USER_ASSIGNED_TO_CUSTOMER" => await GetProcessAssignment(dto),
             _ => ProcessResult.Ignored
         };
     }
@@ -46,16 +51,43 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         if (existingLead is not null)
         {
-            _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+            _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}",
+                externalId, tenantId);
             return ProcessResult.Ignored;
         }
 
+        var phone = dto.Phone ?? throw new ArgumentException("Telefone obrigatório");
+        var normalizedPhone = LeadAttributionService.NormalizePhone(phone);
+
         var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
-
-        var (source, campaign, ad, confidence) = ResolverTracking(dto);
-
         var stageLabel = dto.Stage;
         var stageId = dto.IdStage;
+
+        var originEvent = await _attributionService.FindBestOriginEventAsync(normalizedPhone, tenantId);
+
+        string source, campaign, confidence;
+        string? ad;
+
+        if (originEvent is not null)
+        {
+            var attribution = _attributionService.ExtractAttributionData(originEvent);
+            source = attribution.Source;
+            campaign = attribution.Campaign;
+            ad = attribution.Ad;
+            confidence = attribution.Confidence;
+
+            _logger.LogInformation(
+                "🎯 INTERCEPTAÇÃO: Lead {Phone} terá origem da Meta: {Source} / {Campaign}",
+                phone, source, campaign);
+        }
+        else
+        {
+            (source, campaign, ad, confidence) = ResolverTracking(dto);
+
+            _logger.LogWarning(
+                "⚠️ FALLBACK: Lead {Phone} sem evento da Meta, usando origem Cloudia (baixa confiança)",
+                phone);
+        }
 
         var newLead = new Lead
         {
@@ -63,24 +95,25 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             TenantId = tenantId,
 
             Name = dto.Name ?? "Sem nome",
-            Phone = dto.Phone ?? "Sem telefone",
+            Phone = phone,
             Email = dto.Email,
             Cpf = dto.Cpf,
             Gender = dto.Gender,
             Observations = dto.Observations,
+
             IdFacebookApp = dto.IdFacebookApp,
             HasHealthInsurancePlan = dto.HasHealthInsurancePlan,
             IdChannelIntegration = dto.IdChannelIntegration,
-            LastAdId = dto.LastAdId,
             ConversationState = dto.ConversationState,
 
+            // 🔥 ATRIBUIÇÃO (da Meta ou Cloudia)
             Source = source,
             Channel = ResolverChannel(dto),
             Campaign = campaign,
             Ad = ad,
             TrackingConfidence = confidence,
 
-            CurrentStage = stageLabel ?? "SEM_ETAPA_(TESTE IA)",
+            CurrentStage = stageLabel ?? "SEM_ETAPA",
             CurrentStageId = stageId,
 
             Status = "new",
@@ -88,12 +121,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             HasPayment = GetHasPayment(stageLabel),
 
             Tags = dto.Tags is not null
-                  ? JsonSerializer.Serialize(dto.Tags)
-                  : null,
-
-            AdData = dto.AdData is not null
-                  ? JsonSerializer.Serialize(dto.AdData)
-                  : null,
+                ? JsonSerializer.Serialize(dto.Tags)
+                : null,
 
             UnitId = unit.Id,
 
@@ -106,7 +135,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 new LeadStageHistory
                 {
                     StageId = stageId ?? 0,
-                    StageLabel = stageLabel ?? "SEM_ETAPA_(TESTE IA)",
+                    StageLabel = stageLabel ?? "SEM_ETAPA",
                     ChangedAt = DateTime.UtcNow
                 }
             ]
@@ -115,7 +144,18 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         _db.Leads.Add(newLead);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Lead criado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+        if (originEvent is not null)
+        {
+            await _attributionService.CreateAttributionAsync(
+                newLead.Id,
+                originEvent,
+                normalizedPhone,
+                tenantId);
+        }
+
+        _logger.LogInformation("Lead criado: {ExternalId} / Tenant {TenantId} / Source: {Source}",
+            externalId, tenantId, source);
+
         return ProcessResult.Created;
     }
 
@@ -135,11 +175,37 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         if (lead is null)
         {
-            _logger.LogWarning("Lead não encontrado para atualizar: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+            _logger.LogWarning("Lead não encontrado para atualizar: {ExternalId} / Tenant {TenantId}",
+                externalId, tenantId);
             return ProcessResult.Ignored;
         }
 
-        // ── Campos simples ────────────────────────────────────────────
+        if (_attributionService.ShouldTryImproveAttribution(lead))
+        {
+            var normalizedPhone = LeadAttributionService.NormalizePhone(lead.Phone);
+            var originEvent = await _attributionService.FindBestOriginEventAsync(normalizedPhone, tenantId);
+
+            if (originEvent is not null && _attributionService.IsEventBetter(originEvent, lead))
+            {
+                var attribution = _attributionService.ExtractAttributionData(originEvent);
+
+                lead.Source = attribution.Source;
+                lead.Campaign = attribution.Campaign;
+                lead.Ad = attribution.Ad;
+                lead.TrackingConfidence = attribution.Confidence;
+
+                await _attributionService.CreateAttributionAsync(
+                    lead.Id,
+                    originEvent,
+                    normalizedPhone,
+                    tenantId);
+
+                _logger.LogInformation(
+                    "🔄 MELHORIA: Lead {Phone} teve origem atualizada para {Source}",
+                    lead.Phone, lead.Source);
+            }
+        }
+
         if (dto.Name is not null) lead.Name = dto.Name;
         if (dto.Phone is not null) lead.Phone = dto.Phone;
         if (dto.Email is not null) lead.Email = dto.Email;
@@ -150,22 +216,10 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.HasHealthInsurancePlan.HasValue) lead.HasHealthInsurancePlan = dto.HasHealthInsurancePlan;
         if (dto.IdChannelIntegration.HasValue) lead.IdChannelIntegration = dto.IdChannelIntegration;
         if (dto.LastAdId is not null) lead.LastAdId = dto.LastAdId;
-        if(dto.ConversationState is not null) lead.ConversationState = dto.ConversationState;
+        if (dto.ConversationState is not null) lead.ConversationState = dto.ConversationState;
 
         if (dto.Tags is not null)
             lead.Tags = JsonSerializer.Serialize(dto.Tags);
-
-        if (dto.AdData is not null)
-            lead.AdData = JsonSerializer.Serialize(dto.AdData);
-
-        // ── Tracking (só sobrescreve se vier dado melhor) ─────────────
-        var (source, campaign, ad, confidence) = ResolverTracking(dto);
-
-        if (source != "DESCONHECIDO") lead.Source = source;
-        if (campaign != "DESCONHECIDO") lead.Campaign = campaign;
-        if (ad != "DESCONHECIDO") lead.Ad = ad;
-        if (confidence == "ALTA" || lead.TrackingConfidence != "ALTA")
-            lead.TrackingConfidence = confidence;
 
         lead.Channel = ResolverChannel(dto);
 
@@ -173,14 +227,12 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         if (dto.ConversationState is not null &&
             dto.ConversationState != lead.ConversationState)
         {
-            // Fecha a conversa aberta atual, se existir
             var conversaAberta = lead.Conversations
                 .FirstOrDefault(c => c.EndedAt is null);
 
             if (conversaAberta is not null)
             {
                 conversaAberta.EndedAt = DateTime.UtcNow;
-
                 conversaAberta.Interactions.Add(new LeadInteraction
                 {
                     Type = "STATE_CHANGED",
@@ -189,7 +241,6 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 });
             }
 
-            // Abre nova conversa com o novo estado
             var novaConversa = new LeadConversation
             {
                 LeadId = lead.Id,
@@ -198,14 +249,14 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 ConversationState = dto.ConversationState,
                 StartedAt = DateTime.UtcNow,
                 Interactions =
-            [
-                new LeadInteraction
-                {
-                    Type = "STATE_CHANGED",
-                    Content = dto.ConversationState,
-                    CreatedAt = DateTime.UtcNow
-                }
-            ]
+                [
+                    new LeadInteraction
+                    {
+                        Type = "STATE_CHANGED",
+                        Content = dto.ConversationState,
+                        CreatedAt = DateTime.UtcNow
+                    }
+                ]
             };
 
             lead.Conversations.Add(novaConversa);
@@ -228,22 +279,20 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                     ChangedAt = DateTime.UtcNow
                 });
 
-                // Registra como interação na conversa ativa
                 var conversaAtiva = lead.Conversations.FirstOrDefault(c => c.EndedAt is null);
                 conversaAtiva?.Interactions.Add(new LeadInteraction
-                    {
-                        Type = "STAGE_CHANGED",
-                        Content = $"{lead.CurrentStage} → {novoStage}",
-                        CreatedAt = DateTime.UtcNow
-                    });
+                {
+                    Type = "STAGE_CHANGED",
+                    Content = $"{lead.CurrentStage} → {novoStage}",
+                    CreatedAt = DateTime.UtcNow
+                });
 
                 lead.CurrentStage = novoStage;
                 lead.CurrentStageId = novoStageId;
             }
 
-            lead.HasAppointment = GetAppointmentAvailable(novoStage);
-
             var tinhaPayment = lead.HasPayment;
+            lead.HasAppointment = GetAppointmentAvailable(novoStage);
             lead.HasPayment = GetHasPayment(novoStage);
 
             // ── Pagamento ─────────────────────────────────────────────
@@ -254,18 +303,17 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
                 lead.Payments.Add(new Payment
                 {
                     LeadId = lead.Id,
-                    Amount = 0, // enriquecer quando tiver esse dado no DTO
+                    Amount = 0,
                     PaidAt = DateTime.UtcNow
                 });
 
-                // Registra como interação
                 var conversaAtiva = lead.Conversations.FirstOrDefault(c => c.EndedAt is null);
                 conversaAtiva?.Interactions.Add(new LeadInteraction
-                    {
-                        Type = "PAYMENT",
-                        Content = novoStage,
-                        CreatedAt = DateTime.UtcNow
-                    });
+                {
+                    Type = "PAYMENT",
+                    Content = novoStage,
+                    CreatedAt = DateTime.UtcNow
+                });
             }
         }
 
@@ -292,7 +340,8 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
         if (lead is null)
         {
-            _logger.LogWarning("Lead não encontrado para atualizar tags: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+            _logger.LogWarning("Lead não encontrado para atualizar tags: {ExternalId} / Tenant {TenantId}",
+                externalId, tenantId);
             return ProcessResult.Ignored;
         }
 
@@ -300,7 +349,6 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             lead.Tags = JsonSerializer.Serialize(dto.Data.Tags);
 
         lead.UpdatedAt = DateTime.UtcNow;
-
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Tags do lead atualizadas: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
@@ -507,6 +555,10 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
         return resultado;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🛠️ MÉTODOS AUXILIARES (sem alteração)
+    // ═══════════════════════════════════════════════════════════════
+
     private static (string Source, string Campaign, string? Ad, string Confidence) ResolverTracking(CloudiaLeadDataDto dto)
     {
         if (dto.AdData is not null && dto.AdData.Count > 0)
@@ -565,7 +617,7 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
     {
         if (string.IsNullOrWhiteSpace(stage))
             return false;
-            
+
         return stage is "05_AGENDADO_COM_PAGAMENTO"
             or "09_FECHOU_TRATAMENTO"
             or "10_EM_TRATAMENTO";
@@ -573,18 +625,15 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
 
     private async Task<ProcessResult> GetProcessAssignment(CloudiaWebhookDto dto)
     {
-        // 1. Pega os dados do atendente e do lead
         var externalUserId = dto.AssignedUserId!.Value;
         var externalLeadId = dto.Customer!.Id;
         var tenantId = dto.Customer.ClinicId;
 
-        // 2. Busca ou cria o atendente
         var attendant = await _attendantService.GetOrCreateAsync(
             externalUserId,
             dto.AssignedUserName!,
             dto.AssignedUserEmail);
 
-        // 3. Busca o lead no banco
         var lead = await _db.Leads.FirstOrDefaultAsync(l =>
             l.ExternalId == externalLeadId &&
             l.TenantId == tenantId);
@@ -595,11 +644,9 @@ public class LeadService(AppDbContext db, ILogger<LeadService> logger, UnitServi
             return ProcessResult.Ignored;
         }
 
-        // 4. Atualiza o atendente atual no lead
         lead.AttendantId = attendant.Id;
         lead.UpdatedAt = DateTime.UtcNow;
 
-        // 5. Salva o histórico de atribuição
         _db.LeadAssignments.Add(new LeadAssignment
         {
             LeadId = lead.Id,

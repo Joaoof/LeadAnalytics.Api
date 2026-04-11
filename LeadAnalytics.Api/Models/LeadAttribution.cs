@@ -12,7 +12,6 @@ public class LeadAttribution
     [MaxLength(20)]
     public string Phone { get; set; } = null!;
 
-    [Required]
     [MaxLength(255)]
     public string CtwaClid { get; set; } = null!;
 
@@ -23,10 +22,10 @@ public class LeadAttribution
     public string? SourceType { get; set; }
 
     [MaxLength(100)]
-    public string MatchType { get; set; } = "CTWA";
+    public string MatchType { get; set; } = "UNKNOWN"; // CTWA | SOCIAL | FALLBACK
 
     [MaxLength(50)]
-    public string Confidence { get; set; } = "HIGH";
+    public string Confidence { get; set; } = "LOW";
 
     public DateTime MatchedAt { get; set; } = DateTime.UtcNow;
 

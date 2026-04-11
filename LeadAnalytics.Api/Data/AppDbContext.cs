@@ -13,6 +13,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<LeadConversation> LeadConversations { get; set; }
     public DbSet<LeadInteraction> LeadInteractions { get; set; }
     public DbSet<Payment> Payments { get; set; }
+    public DbSet<OriginEvent> OriginEvents { get; set; }
+    public DbSet<LeadAttribution> LeadAttributions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
