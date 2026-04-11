@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace LeadAnalytics.Api.DTOs;
+namespace LeadAnalytics.Api.DTOs.Cloudia;
 
 public class TagDto
 {

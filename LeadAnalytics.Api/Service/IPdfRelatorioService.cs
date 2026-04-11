@@ -1,4 +1,4 @@
-using LeadAnalytics.Api.DTOs;
+using LeadAnalytics.Api.DTOs.Response;
 
 namespace LeadAnalytics.Api.Service;
 

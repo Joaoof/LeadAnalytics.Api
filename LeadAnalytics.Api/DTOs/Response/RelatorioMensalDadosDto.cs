@@ -1,4 +1,4 @@
-namespace LeadAnalytics.Api.DTOs;
+namespace LeadAnalytics.Api.DTOs.Response;
 
 /// <summary>
 /// Agrega todos os dados necessários para a geração do PDF do relatório mensal.

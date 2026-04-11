@@ -1,5 +1,6 @@
 ﻿using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs;
+using LeadAnalytics.Api.DTOs.Response;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -51,8 +52,11 @@ public class LeadService(
 
         if (existingLead is not null)
         {
-            _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}",
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}",
                 externalId, tenantId);
+            }
             return ProcessResult.Ignored;
         }
 
@@ -76,19 +80,24 @@ public class LeadService(
             ad = attribution.Ad;
             confidence = attribution.Confidence;
 
-            _logger.LogInformation(
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation(
                 "🎯 INTERCEPTAÇÃO: Lead {Phone} terá origem da Meta: {Source} / {Campaign}",
                 phone, source, campaign);
+            }
         }
         else
         {
             (source, campaign, ad, confidence) = ResolverTracking(dto);
 
-            _logger.LogWarning(
-                "⚠️ FALLBACK: Lead {Phone} sem evento da Meta, usando origem Cloudia (baixa confiança)",
-                phone);
+            if (_logger.IsEnabled(LogLevel.Warning))
+            {
+                _logger.LogWarning(
+                    "⚠️ FALLBACK: Lead {Phone} sem evento da Meta, usando origem Cloudia (baixa confiança)",
+                    phone);
+            }
         }
-
         var newLead = new Lead
         {
             ExternalId = externalId,
@@ -153,8 +162,11 @@ public class LeadService(
                 tenantId);
         }
 
-        _logger.LogInformation("Lead criado: {ExternalId} / Tenant {TenantId} / Source: {Source}",
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Lead criado: {ExternalId} / Tenant {TenantId} / Source: {Source}",
             externalId, tenantId, source);
+        }
 
         return ProcessResult.Created;
     }
@@ -320,7 +332,10 @@ public class LeadService(
         lead.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Lead atualizado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Lead atualizado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+        }
         return ProcessResult.Updated;
     }
 
@@ -329,9 +344,12 @@ public class LeadService(
         var externalId = dto?.Data?.Id;
         var tenantId = dto?.Data?.ClinicId;
 
-        _logger.LogInformation("Tags recebidas para {ExternalId}: {Tags}",
-            externalId,
-            JsonSerializer.Serialize(dto?.Data?.Tags));
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Tags recebidas para {ExternalId}: {Tags}",
+                externalId,
+                JsonSerializer.Serialize(dto?.Data?.Tags));
+        }
 
         var lead = await _db.Leads
             .FirstOrDefaultAsync(l =>
@@ -351,7 +369,10 @@ public class LeadService(
         lead.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Tags do lead atualizadas: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation("Tags do lead atualizadas: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
+        }
         return ProcessResult.Updated;
     }
 

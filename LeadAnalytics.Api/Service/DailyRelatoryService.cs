@@ -1,5 +1,5 @@
 ﻿using LeadAnalytics.Api.Data;
-using LeadAnalytics.Api.DTOs;
+using LeadAnalytics.Api.DTOs.Response;
 using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Service;

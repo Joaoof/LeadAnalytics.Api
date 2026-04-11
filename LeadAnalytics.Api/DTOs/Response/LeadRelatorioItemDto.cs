@@ -1,4 +1,4 @@
-namespace LeadAnalytics.Api.DTOs;
+namespace LeadAnalytics.Api.DTOs.Response;
 
 public sealed record LeadRelatorioItemDto(
     string Nome,
