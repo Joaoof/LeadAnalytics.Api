@@ -89,7 +89,7 @@ public class LeadService(
         }
 
         // ✅ PHONE PODE SER NULL (será atualizado depois)
-        var phone = dto.Phone ?? "SEM_TELEFONE";
+        var phone = dto.Phone;
         var normalizedPhone = LeadAttributionService.NormalizePhone(phone);
 
         var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
@@ -142,7 +142,7 @@ public class LeadService(
             TenantId = tenantId,
 
             Name = dto.Name ?? "Sem nome",
-            Phone = phone,  // ✅ Pode ser "SEM_TELEFONE"
+            Phone = phone,  // 
             Email = dto.Email,
             Cpf = dto.Cpf,
             Gender = dto.Gender,
