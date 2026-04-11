@@ -89,8 +89,9 @@ public class LeadService(
         }
 
         // ✅ PHONE PODE SER NULL (será atualizado depois)
-        var phone = dto.Phone;
-             //LeadAttributionService.NormalizePhone(phone);
+        var phone = dto.Phone ?? "PENDENTE";
+        var email = dto.Email ?? "PENDENTE";
+        //LeadAttributionService.NormalizePhone(phone);
 
         var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
         var stageLabel = dto.Stage;
@@ -143,7 +144,7 @@ public class LeadService(
 
             Name = dto.Name ?? "Sem nome",
             Phone = phone,  // 
-            Email = dto.Email,
+            Email = email,
             Cpf = dto.Cpf,
             Gender = dto.Gender,
             Observations = dto.Observations,
