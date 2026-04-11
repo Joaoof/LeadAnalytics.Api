@@ -4,6 +4,7 @@ using LeadAnalytics.Api.DTOs.Response;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Threading.Channels;
 
 namespace LeadAnalytics.Api.Service;
 
@@ -109,6 +110,10 @@ public class LeadService(
                     phone);
             }
         }
+
+        var channel = ResolverChannel(dto);
+        var conversationState = dto.ConversationState ?? "bot";
+
         var newLead = new Lead
         {
             ExternalId = externalId,
@@ -157,6 +162,24 @@ public class LeadService(
                     StageId = stageId ?? 0,
                     StageLabel = stageLabel ?? "SEM_ETAPA",
                     ChangedAt = DateTime.UtcNow
+                }
+            ],
+            Conversations = [
+                new LeadConversation
+                {
+                    Channel = channel,
+                    Source = source,
+                    ConversationState = conversationState,
+                    StartedAt = DateTime.UtcNow,
+            
+                    Interactions = [
+                        new LeadInteraction
+                        {
+                            Type = "LEAD_CREATED",
+                            Content = $"Lead criado via {source}",
+                            CreatedAt = DateTime.UtcNow
+                        }
+                    ]
                 }
             ]
         };
