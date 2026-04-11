@@ -22,23 +22,27 @@ public class LeadAttributionService(AppDbContext db, ILogger<LeadAttributionServ
     {
         var cutoff = DateTime.UtcNow.AddHours(-24);
 
-        var bestEvent = await _db.OriginEvents
+        // 1️⃣ Busca TODOS os eventos não processados (executa no banco)
+        var events = await _db.OriginEvents
             .Where(e =>
                 e.Phone == normalizedPhone &&
                 !e.Processed &&
                 e.TenantId == tenantId &&
                 e.ReceivedAt >= cutoff)
+            .ToListAsync();
+
+        // 2️⃣ Ordena em memória (C#, não SQL)
+        var bestEvent = events
             .OrderByDescending(e => GetSourceTypePriority(e.SourceType))
             .ThenByDescending(e => e.ReceivedAt)
-            .FirstOrDefaultAsync();
+            .FirstOrDefault();
 
         if (bestEvent is not null)
         {
             if (_logger.IsEnabled(LogLevel.Information))
                 _logger.LogInformation(
-                "🎯 Evento encontrado: {Phone} → {SourceType} (ID: {EventId})",
-                normalizedPhone, bestEvent.SourceType, bestEvent.Id);
-            return bestEvent;
+                    "🎯 Evento encontrado: {Phone} → {SourceType} (ID: {EventId})",
+                    normalizedPhone, bestEvent.SourceType, bestEvent.Id);
         }
         else
         {
