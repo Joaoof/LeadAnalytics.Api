@@ -49,6 +49,30 @@ public class LeadService(
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
 
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+            "📥 CreateLeadAsync - DADOS RECEBIDOS:\n" +
+            "ExternalId: {ExternalId}\n" +
+            "TenantId: {TenantId}\n" +
+            "Name: '{Name}'\n" +
+            "Phone: '{Phone}'\n" +
+            "Stage: '{Stage}'\n" +
+            "IdStage: {IdStage}\n" +
+            "Tags: {Tags}\n" +
+            "ConversationState: '{ConversationState}'",
+            externalId,
+            tenantId,
+            dto.Name ?? "NULL",
+            dto.Phone ?? "NULL",
+            dto.Stage ?? "NULL",
+            dto.IdStage?.ToString() ?? "NULL",
+            dto.Tags is not null ? JsonSerializer.Serialize(dto.Tags) : "NULL",
+            dto.ConversationState ?? "NULL"
+        );
+        }
+
+
         // ✅ VERIFICAR SE TEM DADOS MÍNIMOS
         if (string.IsNullOrWhiteSpace(dto.Phone) && string.IsNullOrWhiteSpace(dto.Email))
         {
