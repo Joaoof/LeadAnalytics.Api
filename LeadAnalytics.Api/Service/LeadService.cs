@@ -185,7 +185,7 @@ public class LeadService(
             Ad = ad,
             TrackingConfidence = confidence,
 
-            CurrentStage = stageLabel ?? "SEM_ETAPA",
+            CurrentStage = stageLabel,
             CurrentStageId = stageId,
 
             Status = "new",
