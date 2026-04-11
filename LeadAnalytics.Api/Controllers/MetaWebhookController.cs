@@ -1,4 +1,5 @@
 ﻿using LeadAnalytics.Api.DTOs;
+using LeadAnalytics.Api.DTOs.Cloudia;
 using LeadAnalytics.Api.DTOs.Meta;
 using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Mvc;
@@ -9,11 +10,11 @@ namespace LeadAnalytics.Api.Controllers;
 [Route("api/webhooks")]
 public class MetaWebhookController(
     MetaWebhookService metaWebhookService,
-    ILogger<MetaWebhookController> logger) : ControllerBase
+    ILogger<MetaWebhookController> logger, LeadService leadService) : ControllerBase
 {
     private readonly MetaWebhookService _metaWebhookService = metaWebhookService;
     private readonly ILogger<MetaWebhookController> _logger = logger;
-
+    private readonly LeadService _leadService = leadService;
     /// <summary>
     /// Endpoint de verificação do webhook da Meta
     /// </summary>
@@ -108,4 +109,46 @@ public class MetaWebhookController(
             });
         }
     }
+
+    // <summary>
+    /// Recebe webhooks da Cloudia
+    /// Eventos: CUSTOMER_CREATED, CUSTOMER_UPDATED, CUSTOMER_TAGS_UPDATED, USER_ASSIGNED_TO_CUSTOMER
+    /// </summary>
+    [HttpPost("cloudia")]
+    public async Task<IActionResult> ReceiveCloudiaWebhook([FromBody] CloudiaWebhookDto webhook)
+    {
+        try
+        {
+            _logger.LogInformation("📨 Webhook Cloudia recebido: {Type}", webhook.Type);
+
+            var result = await _leadService.SaveLeadAsync(webhook);
+
+            var message = result switch
+            {
+                ProcessResult.Created => "Lead criado com sucesso",
+                ProcessResult.Updated => "Lead atualizado com sucesso",
+                ProcessResult.Ignored => "Evento ignorado",
+                _ => "Processado"
+            };
+
+            return Ok(new
+            {
+                success = true,
+                message,
+                result = result.ToString()
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Erro ao processar webhook da Cloudia");
+
+            return Ok(new
+            {
+                success = false,
+                message = "Erro ao processar webhook",
+                error = ex.Message
+            });
+        }
+    }
+
 }
