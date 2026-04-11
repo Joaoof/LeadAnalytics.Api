@@ -20,7 +20,7 @@ public class LeadService(
     private readonly AttendantService _attendantService = attendantService;
     private readonly LeadAttributionService _attributionService = attributionService;
 
-    public async Task<ProcessResult> SaveLeadAsync(CloudiaWebhookDto dto)
+    public async Task<LeadProcessResponseDto> SaveLeadAsync(CloudiaWebhookDto dto)
     {
         return dto.Type switch
         {
@@ -28,9 +28,13 @@ public class LeadService(
             "CUSTOMER_UPDATED" => await UpdateLeadAsync(dto.Data),
             "CUSTOMER_TAGS_UPDATED" => await UpdateUserTagAsync(dto),
             "USER_ASSIGNED_TO_CUSTOMER" => await GetProcessAssignment(dto),
-            _ => ProcessResult.Ignored
+            _ => new LeadProcessResponseDto
+            {
+                Message = $"Tipo de evento desconhecido: {dto.Type}",
+                Result = ProcessResult.Ignored,
+            }
         };
-    }
+     }
 
     public async Task<List<Lead>> GetAllLeadsAsync()
     {
@@ -39,7 +43,7 @@ public class LeadService(
             .ToListAsync();
     }
 
-    private async Task<ProcessResult> CreateLeadAsync(CloudiaLeadDataDto dto)
+    private async Task<LeadProcessResponseDto> CreateLeadAsync(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
@@ -57,7 +61,14 @@ public class LeadService(
                 _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}",
                 externalId, tenantId);
             }
-            return ProcessResult.Ignored;
+
+            return new LeadProcessResponseDto {
+                LeadId = existingLead.Id,
+                Message = "Lead já existe, processo de criação ignorado",
+                Result = ProcessResult.Ignored,
+                Source = existingLead.Source,
+                TrackingConfidence = existingLead.TrackingConfidence
+            };
         }
 
         var phone = dto.Phone ?? throw new ArgumentException("Telefone obrigatório");
@@ -168,10 +179,16 @@ public class LeadService(
             externalId, tenantId, source);
         }
 
-        return ProcessResult.Created;
+        return new LeadProcessResponseDto {
+            LeadId = newLead.Id,
+            Message = "Lead criado",
+            Result = ProcessResult.Created,
+            Source = newLead.Source,
+            TrackingConfidence = newLead.TrackingConfidence
+        };
     }
 
-    private async Task<ProcessResult> UpdateLeadAsync(CloudiaLeadDataDto dto)
+    private async Task<LeadProcessResponseDto> UpdateLeadAsync(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
@@ -189,7 +206,11 @@ public class LeadService(
         {
             _logger.LogWarning("Lead não encontrado para atualizar: {ExternalId} / Tenant {TenantId}",
                 externalId, tenantId);
-            return ProcessResult.Ignored;
+            return new LeadProcessResponseDto
+            {
+                LeadId = externalId,
+                Message = "Lead não encontrado para atualização",
+            };
         }
 
         if (_attributionService.ShouldTryImproveAttribution(lead))
@@ -336,10 +357,17 @@ public class LeadService(
         {
             _logger.LogInformation("Lead atualizado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
         }
-        return ProcessResult.Updated;
+
+        return new LeadProcessResponseDto {
+            LeadId = lead.Id,
+            Message = "Lead atualizado",
+            Result = ProcessResult.Updated,
+            Source = lead.Source,
+            TrackingConfidence = lead.TrackingConfidence,
+        };
     }
 
-    public async Task<ProcessResult> UpdateUserTagAsync(CloudiaWebhookDto dto)
+    public async Task<LeadProcessResponseDto> UpdateUserTagAsync(CloudiaWebhookDto dto)
     {
         var externalId = dto?.Data?.Id;
         var tenantId = dto?.Data?.ClinicId;
@@ -360,7 +388,14 @@ public class LeadService(
         {
             _logger.LogWarning("Lead não encontrado para atualizar tags: {ExternalId} / Tenant {TenantId}",
                 externalId, tenantId);
-            return ProcessResult.Ignored;
+            return new LeadProcessResponseDto
+            {
+                LeadId = null,
+                Message = "Lead não encontrado para atualização de tags",
+                Result = ProcessResult.Ignored,
+                Source = null,
+                TrackingConfidence = null
+            };
         }
 
         if (dto?.Data?.Tags is not null)
@@ -373,7 +408,14 @@ public class LeadService(
         {
             _logger.LogInformation("Tags do lead atualizadas: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
         }
-        return ProcessResult.Updated;
+        return new LeadProcessResponseDto
+        {
+            LeadId = lead.Id,
+            Message = "Tags atualizadas",
+            Result = ProcessResult.Updated,
+            Source = lead.Source,
+            TrackingConfidence = lead.TrackingConfidence
+        };
     }
 
     public async Task<int> GetCheckClosedQueries(int clinicId)
@@ -644,7 +686,7 @@ public class LeadService(
             or "10_EM_TRATAMENTO";
     }
 
-    private async Task<ProcessResult> GetProcessAssignment(CloudiaWebhookDto dto)
+    private async Task<LeadProcessResponseDto> GetProcessAssignment(CloudiaWebhookDto dto)
     {
         var externalUserId = dto.AssignedUserId!.Value;
         var externalLeadId = dto.Customer!.Id;
@@ -662,7 +704,12 @@ public class LeadService(
         if (lead is null)
         {
             _logger.LogWarning("Lead não encontrado para atribuição: {LeadId}", externalLeadId);
-            return ProcessResult.Ignored;
+            return new LeadProcessResponseDto
+            {
+                Result = ProcessResult.Ignored,
+                LeadId = null,
+                Message = "Lead não encontrado"
+            };
         }
 
         lead.AttendantId = attendant.Id;
@@ -679,7 +726,14 @@ public class LeadService(
         await _db.SaveChangesAsync();
 
         _logger.LogInformation("Lead {LeadId} atribuído para {Name}", externalLeadId, dto.AssignedUserName);
-        return ProcessResult.Updated;
+        return new LeadProcessResponseDto
+        {
+            LeadId = lead.Id,
+            Message = $"Lead atribuído para {dto.AssignedUserName}",
+            Result = ProcessResult.Updated,
+            Source = lead.Source,
+            TrackingConfidence = lead.TrackingConfidence,
+        };
     }
 }
 

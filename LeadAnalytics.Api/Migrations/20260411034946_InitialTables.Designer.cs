@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LeadAnalytics.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260408032816_AdicionarPhoneAttendant")]
-    partial class AdicionarPhoneAttendant
+    [Migration("20260411034946_InitialTables")]
+    partial class InitialTables
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -66,9 +66,6 @@ namespace LeadAnalytics.Api.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Ad")
-                        .HasColumnType("text");
-
-                    b.Property<string>("AdData")
                         .HasColumnType("text");
 
                     b.Property<int?>("AttendantId")
@@ -206,6 +203,61 @@ namespace LeadAnalytics.Api.Migrations
                     b.ToTable("lead_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadAttribution", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("CtwaClid")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<int>("LeadId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("MatchType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("MatchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OriginEventId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("SourceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OriginEventId");
+
+                    b.ToTable("LeadAttributions");
+                });
+
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
                 {
                     b.Property<int>("Id")
@@ -300,6 +352,78 @@ namespace LeadAnalytics.Api.Migrations
                     b.ToTable("lead_stage_histories", (string)null);
                 });
 
+            modelBuilder.Entity("LeadAnalytics.Api.Models.OriginEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Confidence")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ContactName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("CtwaClid")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Headline")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("MessageId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime?>("MessageTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("Processed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SourceId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceType")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceUrl")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("WebhookEventId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WebhookEventId");
+
+                    b.ToTable("OriginEvents");
+                });
+
             modelBuilder.Entity("LeadAnalytics.Api.Models.Payment", b =>
                 {
                     b.Property<int>("Id")
@@ -350,6 +474,40 @@ namespace LeadAnalytics.Api.Migrations
                     b.ToTable("units", (string)null);
                 });
 
+            modelBuilder.Entity("LeadAnalytics.Api.Models.WebhookEvent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PayloadJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhoneNumberId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WebhookEvents");
+                });
+
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
                     b.HasOne("LeadAnalytics.Api.Models.Attendant", "Attendant")
@@ -384,6 +542,17 @@ namespace LeadAnalytics.Api.Migrations
                     b.Navigation("Lead");
                 });
 
+            modelBuilder.Entity("LeadAnalytics.Api.Models.LeadAttribution", b =>
+                {
+                    b.HasOne("LeadAnalytics.Api.Models.OriginEvent", "OriginEvent")
+                        .WithMany()
+                        .HasForeignKey("OriginEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("OriginEvent");
+                });
+
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
                 {
                     b.HasOne("LeadAnalytics.Api.Models.Lead", "Lead")
@@ -415,6 +584,15 @@ namespace LeadAnalytics.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Lead");
+                });
+
+            modelBuilder.Entity("LeadAnalytics.Api.Models.OriginEvent", b =>
+                {
+                    b.HasOne("LeadAnalytics.Api.Models.WebhookEvent", "WebhookEvent")
+                        .WithMany()
+                        .HasForeignKey("WebhookEventId");
+
+                    b.Navigation("WebhookEvent");
                 });
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.Payment", b =>

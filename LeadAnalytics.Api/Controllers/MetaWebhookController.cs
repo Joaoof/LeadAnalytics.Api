@@ -123,7 +123,7 @@ public class MetaWebhookController(
 
             var result = await _leadService.SaveLeadAsync(webhook);
 
-            var message = result switch
+            var message = result.Result switch
             {
                 ProcessResult.Created => "Lead criado com sucesso",
                 ProcessResult.Updated => "Lead atualizado com sucesso",
@@ -135,7 +135,7 @@ public class MetaWebhookController(
             {
                 success = true,
                 message,
-                result = result.ToString()
+                result = result.Result.ToString()
             });
         }
         catch (Exception ex)
