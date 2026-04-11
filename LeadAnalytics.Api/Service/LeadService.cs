@@ -4,7 +4,6 @@ using LeadAnalytics.Api.DTOs.Response;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
-using System.Threading.Channels;
 
 namespace LeadAnalytics.Api.Service;
 
@@ -256,9 +255,12 @@ public class LeadService(
                     normalizedPhone,
                     tenantId);
 
-                _logger.LogInformation(
+                if (_logger.IsEnabled(LogLevel.Information))
+                {
+                    _logger.LogInformation(
                     "🔄 MELHORIA: Lead {Phone} teve origem atualizada para {Source}",
                     lead.Phone, lead.Source);
+                }
             }
         }
 

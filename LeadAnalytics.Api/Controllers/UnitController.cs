@@ -1,6 +1,5 @@
 ﻿using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.OpenApi;
 
 namespace LeadAnalytics.Api.Controllers;
 
