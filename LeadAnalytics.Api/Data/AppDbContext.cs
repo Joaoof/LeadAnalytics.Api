@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<OriginEvent> OriginEvents { get; set; }
     public DbSet<LeadAttribution> LeadAttributions { get; set; }
 
+    public DbSet<WebhookEvent> WebhookEvents { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // ─── Lead ────────────────────────────────────────────────

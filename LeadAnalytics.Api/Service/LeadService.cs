@@ -1,5 +1,5 @@
 ﻿using LeadAnalytics.Api.Data;
-using LeadAnalytics.Api.DTOs;
+using LeadAnalytics.Api.DTOs.Cloudia;
 using LeadAnalytics.Api.DTOs.Response;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -430,7 +430,7 @@ public class LeadService(
             .GroupBy(l => l.Source)
             .Select(g => new OrigemAgrupadaDto
             {
-                Origem = g.Key ?? "SEM_ORIGEM",
+                Origem = g.Key,
                 Quantidade = g.Count()
             })
             .ToListAsync();

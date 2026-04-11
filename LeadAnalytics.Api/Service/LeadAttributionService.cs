@@ -34,9 +34,11 @@ public class LeadAttributionService(AppDbContext db, ILogger<LeadAttributionServ
 
         if (bestEvent is not null)
         {
-            _logger.LogInformation(
+            if (_logger.IsEnabled(LogLevel.Information))
+                _logger.LogInformation(
                 "🎯 Evento encontrado: {Phone} → {SourceType} (ID: {EventId})",
                 normalizedPhone, bestEvent.SourceType, bestEvent.Id);
+            return bestEvent;
         }
         else
         {

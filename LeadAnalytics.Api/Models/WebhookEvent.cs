@@ -6,9 +6,9 @@ public class WebhookEvent
 {
     public int Id { get; set; }
     [Required]
-    public string Provider { get; set; } = "META_WHATSAPP";
+    public string Provider { get; set; }
     [Required]
-    public string EventType { get; set; } = "messages";
+    public string EventType { get; set; }
     [Required]
     public string PayloadJson { get; set; } = null!;
     public string? PhoneNumberId { get; set; }
