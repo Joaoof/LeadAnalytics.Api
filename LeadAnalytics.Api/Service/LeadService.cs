@@ -247,16 +247,22 @@ public class LeadService(
                 l.ExternalId == externalId &&
                 l.TenantId == tenantId);
 
+        // ✅ SE NÃO EXISTIR, CRIAR AGORA (primeiro UPDATE pode ser o CREATE real)
         if (lead is null)
         {
-            _logger.LogWarning("Lead não encontrado para atualizar: {ExternalId} / Tenant {TenantId}",
-                externalId, tenantId);
-            return new LeadProcessResponseDto
+            if (_logger.IsEnabled(LogLevel.Information))
             {
-                LeadId = externalId,
-                Message = "Lead não encontrado para atualização",
-            };
+                _logger.LogInformation(
+                    "🆕 Lead não encontrado no UPDATE, criando agora: {ExternalId} / Tenant {TenantId}",
+                    externalId, tenantId);
+            }
+            // Chamar CreateLeadAsync
+            return await CreateLeadAsync(dto);
         }
+
+        // ────────────────────────────────────────────────────────────────
+        // Lead existe, continuar com UPDATE normal
+        // ────────────────────────────────────────────────────────────────
 
         if (_attributionService.ShouldTryImproveAttribution(lead))
         {
@@ -332,11 +338,11 @@ public class LeadService(
                 Interactions =
                 [
                     new LeadInteraction
-                    {
-                        Type = "STATE_CHANGED",
-                        Content = dto.ConversationState,
-                        CreatedAt = DateTime.UtcNow
-                    }
+                {
+                    Type = "STATE_CHANGED",
+                    Content = dto.ConversationState,
+                    CreatedAt = DateTime.UtcNow
+                }
                 ]
             };
 
@@ -406,7 +412,8 @@ public class LeadService(
             _logger.LogInformation("Lead atualizado: {ExternalId} / Tenant {TenantId}", externalId, tenantId);
         }
 
-        return new LeadProcessResponseDto {
+        return new LeadProcessResponseDto
+        {
             LeadId = lead.Id,
             Message = "Lead atualizado",
             Result = ProcessResult.Updated,
@@ -414,7 +421,6 @@ public class LeadService(
             TrackingConfidence = lead.TrackingConfidence,
         };
     }
-
     public async Task<LeadProcessResponseDto> UpdateUserTagAsync(CloudiaWebhookDto dto)
     {
         var externalId = dto?.Data?.Id;
@@ -682,8 +688,8 @@ public class LeadService(
                     ? dto.Origin.Trim().ToUpperInvariant()
                     : "DESCONHECIDO");
 
-            var campaign = !string.IsNullOrWhiteSpace(item.AdId)
-                ? item.AdId.Trim()
+            var campaign = !string.IsNullOrWhiteSpace(item.Id)
+                ? item.Id.Trim()
                 : "DESCONHECIDO";
 
             var ad = !string.IsNullOrWhiteSpace(item.AdName)
