@@ -68,5 +68,5 @@ public class CloudiaLeadDataDto
     public int? RegisteredOnWhatsApp { get; set; }
 
     [JsonPropertyName("tags")]
-    public List<string>? Tags { get; set; }
+    public List<TagDto>? Tags { get; set; }
 }

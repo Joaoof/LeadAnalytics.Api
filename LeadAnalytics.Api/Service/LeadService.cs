@@ -168,9 +168,9 @@ public class LeadService(
             HasAppointment = GetAppointmentAvailable(stageLabel),
             HasPayment = GetHasPayment(stageLabel),
 
-            Tags = dto.Tags is not null
-                ? JsonSerializer.Serialize(dto.Tags)
-                : null,
+            Tags = dto.Tags is not null && dto.Tags.Count > 0
+            ? JsonSerializer.Serialize(dto.Tags)
+            : null,
 
             UnitId = unit.Id,
 
@@ -689,8 +689,8 @@ public class LeadService(
                     ? dto.Origin.Trim().ToUpperInvariant()
                     : "DESCONHECIDO");
 
-            var campaign = !string.IsNullOrWhiteSpace(item.Id)
-                ? item.Id.Trim()
+            var campaign = !string.IsNullOrWhiteSpace(item.AdId)
+                ? item.AdId.Trim()
                 : "DESCONHECIDO";
 
             var ad = !string.IsNullOrWhiteSpace(item.AdName)
