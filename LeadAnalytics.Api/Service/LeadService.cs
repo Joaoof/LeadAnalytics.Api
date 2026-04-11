@@ -43,10 +43,26 @@ public class LeadService(
             .ToListAsync();
     }
 
+    // LeadService.cs - CreateLeadAsync
     private async Task<LeadProcessResponseDto> CreateLeadAsync(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
         var tenantId = dto.ClinicId;
+
+        // ✅ VERIFICAR SE TEM DADOS MÍNIMOS
+        if (string.IsNullOrWhiteSpace(dto.Phone) && string.IsNullOrWhiteSpace(dto.Email))
+        {
+            _logger.LogWarning(
+                "⚠️ Lead sem telefone e sem email: {ExternalId} / Tenant {TenantId}. Evento ignorado.",
+                externalId, tenantId);
+
+            return new LeadProcessResponseDto
+            {
+                LeadId = externalId,
+                Message = "Lead sem telefone/email - aguardando atualização da Cloudia",
+                Result = ProcessResult.Ignored,
+            };
+        }
 
         var existingLead = await _db.Leads
             .Include(l => l.StageHistory)
@@ -59,10 +75,11 @@ public class LeadService(
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Lead já existe e será ignorado: {ExternalId} / Tenant {TenantId}",
-                externalId, tenantId);
+                    externalId, tenantId);
             }
 
-            return new LeadProcessResponseDto {
+            return new LeadProcessResponseDto
+            {
                 LeadId = existingLead.Id,
                 Message = "Lead já existe, processo de criação ignorado",
                 Result = ProcessResult.Ignored,
@@ -71,14 +88,20 @@ public class LeadService(
             };
         }
 
-        var phone = dto.Phone ?? throw new ArgumentException("Telefone obrigatório");
+        // ✅ PHONE PODE SER NULL (será atualizado depois)
+        var phone = dto.Phone ?? "SEM_TELEFONE";
         var normalizedPhone = LeadAttributionService.NormalizePhone(phone);
 
         var unit = await _unitService.GetOrCreateAsync(dto.ClinicId);
         var stageLabel = dto.Stage;
         var stageId = dto.IdStage;
 
-        var originEvent = await _attributionService.FindBestOriginEventAsync(normalizedPhone, tenantId);
+        // Só tentar buscar OriginEvent se tiver telefone real
+        OriginEvent? originEvent = null;
+        if (dto.Phone is not null)
+        {
+            originEvent = await _attributionService.FindBestOriginEventAsync(normalizedPhone, tenantId);
+        }
 
         string source, campaign, confidence;
         string? ad;
@@ -119,7 +142,7 @@ public class LeadService(
             TenantId = tenantId,
 
             Name = dto.Name ?? "Sem nome",
-            Phone = phone,
+            Phone = phone,  // ✅ Pode ser "SEM_TELEFONE"
             Email = dto.Email,
             Cpf = dto.Cpf,
             Gender = dto.Gender,
@@ -132,7 +155,7 @@ public class LeadService(
 
             // 🔥 ATRIBUIÇÃO (da Meta ou Cloudia)
             Source = source,
-            Channel = ResolverChannel(dto),
+            Channel = channel,
             Campaign = campaign,
             Ad = ad,
             TrackingConfidence = confidence,
@@ -157,29 +180,29 @@ public class LeadService(
             StageHistory =
             [
                 new LeadStageHistory
-                {
-                    StageId = stageId ?? 0,
-                    StageLabel = stageLabel ?? "SEM_ETAPA",
-                    ChangedAt = DateTime.UtcNow
-                }
+            {
+                StageId = stageId ?? 0,
+                StageLabel = stageLabel ?? "SEM_ETAPA",
+                ChangedAt = DateTime.UtcNow
+            }
             ],
             Conversations = [
                 new LeadConversation
-                {
-                    Channel = channel,
-                    Source = source,
-                    ConversationState = conversationState,
-                    StartedAt = DateTime.UtcNow,
-            
-                    Interactions = [
-                        new LeadInteraction
-                        {
-                            Type = "LEAD_CREATED",
-                            Content = $"Lead criado via {source}",
-                            CreatedAt = DateTime.UtcNow
-                        }
-                    ]
-                }
+            {
+                Channel = channel,
+                Source = source,
+                ConversationState = conversationState,
+                StartedAt = DateTime.UtcNow,
+
+                Interactions = [
+                    new LeadInteraction
+                    {
+                        Type = "LEAD_CREATED",
+                        Content = $"Lead criado via {source}",
+                        CreatedAt = DateTime.UtcNow
+                    }
+                ]
+            }
             ]
         };
 
@@ -201,7 +224,8 @@ public class LeadService(
             externalId, tenantId, source);
         }
 
-        return new LeadProcessResponseDto {
+        return new LeadProcessResponseDto
+        {
             LeadId = newLead.Id,
             Message = "Lead criado",
             Result = ProcessResult.Created,
@@ -209,7 +233,6 @@ public class LeadService(
             TrackingConfidence = newLead.TrackingConfidence
         };
     }
-
     private async Task<LeadProcessResponseDto> UpdateLeadAsync(CloudiaLeadDataDto dto)
     {
         var externalId = dto.Id;
