@@ -9,7 +9,7 @@ public class AttendantService(AppDbContext db, ILogger<AttendantService> logger)
     private readonly AppDbContext _db = db;
     private readonly ILogger<AttendantService> _logger = logger;
 
-    public async Task<Attendant> GetOrCreateAsync(int externalId, string name, string? email)
+    public async Task<Attendant> GetOrCreateAsync(int externalId, string name, string? email, int unitId)
     {
         var attendant = await _db.Attendants
             .FirstOrDefaultAsync(a => a.ExternalId == externalId);
@@ -22,6 +22,8 @@ public class AttendantService(AppDbContext db, ILogger<AttendantService> logger)
                 Name = name,
                 Email = email,
                 CreatedAt = DateTime.UtcNow,
+                UnitId = unitId
+
             };
 
             _db.Attendants.Add(attendant);

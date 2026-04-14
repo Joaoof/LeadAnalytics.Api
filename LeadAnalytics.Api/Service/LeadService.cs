@@ -807,7 +807,9 @@ public class LeadService(
         var attendant = await _attendantService.GetOrCreateAsync(
             externalUserId,
             dto.AssignedUserName!,
-            dto.AssignedUserEmail);
+            dto.AssignedUserEmail,
+            tenantId
+            );
 
         var lead = await _db.Leads.FirstOrDefaultAsync(l =>
             l.ExternalId == externalLeadId &&
