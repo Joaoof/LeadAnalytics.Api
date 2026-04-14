@@ -32,6 +32,8 @@ builder.Services.AddScoped<SyncN8N>();
 builder.Services.AddScoped<DailyRelatoryService>();
 builder.Services.AddScoped<LeadAttributionService>();
 builder.Services.AddScoped<MetaWebhookService>(); 
+builder.Services.AddScoped<ConfigurationService>();
+
 
 var app = builder.Build();
 

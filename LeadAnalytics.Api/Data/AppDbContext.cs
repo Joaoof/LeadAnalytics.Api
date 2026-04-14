@@ -15,6 +15,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Payment> Payments { get; set; }
     public DbSet<OriginEvent> OriginEvents { get; set; }
     public DbSet<LeadAttribution> LeadAttributions { get; set; }
+    public DbSet<AppConfiguration> AppConfigurations { get; set; }
 
     public DbSet<WebhookEvent> WebhookEvents { get; set; }
 
