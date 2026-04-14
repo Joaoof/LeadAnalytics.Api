@@ -21,7 +21,7 @@ public class AttendantService(AppDbContext db, ILogger<AttendantService> logger)
                 ExternalId = externalId,
                 Name = name,
                 Email = email,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
             };
 
             _db.Attendants.Add(attendant);

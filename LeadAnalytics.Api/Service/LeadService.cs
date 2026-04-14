@@ -802,6 +802,7 @@ public class LeadService(
         var externalUserId = dto.AssignedUserId!.Value;
         var externalLeadId = dto.Customer!.Id;
         var tenantId = dto.Customer.ClinicId;
+        var conversationState = dto.Data?.ConversationState ?? "bot";
 
         var attendant = await _attendantService.GetOrCreateAsync(
             externalUserId,
@@ -825,6 +826,7 @@ public class LeadService(
 
         lead.AttendantId = attendant.Id;
         lead.UpdatedAt = DateTime.UtcNow;
+        lead.ConversationState = conversationState;
 
         _db.LeadAssignments.Add(new LeadAssignment
         {
