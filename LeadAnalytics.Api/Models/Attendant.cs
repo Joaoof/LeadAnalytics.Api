@@ -8,5 +8,8 @@ public class Attendant
     public string? Email { get; set; }
     public string? Phone { get; set; } // ← adiciona
     public DateTime CreatedAt { get; set; }
+
+    public int UnitId { get; set; } = 8020;
+    public Unit Unit { get; set; } = null!;
     public List<LeadAssignment> Assignments { get; set; } = [];
 }

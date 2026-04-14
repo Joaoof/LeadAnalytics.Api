@@ -3,6 +3,7 @@ using System;
 using LeadAnalytics.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace LeadAnalytics.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260414002216_ConfigurationApiToken")]
+    partial class ConfigurationApiToken
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -76,15 +79,10 @@ namespace LeadAnalytics.Api.Migrations
                     b.Property<string>("Phone")
                         .HasColumnType("text");
 
-                    b.Property<int>("UnitId")
-                        .HasColumnType("integer");
-
                     b.HasKey("Id");
 
                     b.HasIndex("ExternalId")
                         .IsUnique();
-
-                    b.HasIndex("UnitId");
 
                     b.ToTable("attendants", (string)null);
                 });
@@ -156,9 +154,6 @@ namespace LeadAnalytics.Api.Migrations
 
                     b.Property<string>("LastAdId")
                         .HasColumnType("text");
-
-                    b.Property<DateTime>("LastUpdatedAt")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -301,9 +296,6 @@ namespace LeadAnalytics.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("AttendantId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Channel")
                         .IsRequired()
                         .HasColumnType("text");
@@ -325,8 +317,6 @@ namespace LeadAnalytics.Api.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AttendantId");
 
                     b.HasIndex("LeadId");
 
@@ -548,17 +538,6 @@ namespace LeadAnalytics.Api.Migrations
                     b.ToTable("WebhookEvents");
                 });
 
-            modelBuilder.Entity("LeadAnalytics.Api.Models.Attendant", b =>
-                {
-                    b.HasOne("LeadAnalytics.Api.Models.Unit", "Unit")
-                        .WithMany()
-                        .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Unit");
-                });
-
             modelBuilder.Entity("LeadAnalytics.Api.Models.Lead", b =>
                 {
                     b.HasOne("LeadAnalytics.Api.Models.Attendant", "Attendant")
@@ -606,17 +585,11 @@ namespace LeadAnalytics.Api.Migrations
 
             modelBuilder.Entity("LeadAnalytics.Api.Models.LeadConversation", b =>
                 {
-                    b.HasOne("LeadAnalytics.Api.Models.Attendant", "Attendant")
-                        .WithMany()
-                        .HasForeignKey("AttendantId");
-
                     b.HasOne("LeadAnalytics.Api.Models.Lead", "Lead")
                         .WithMany("Conversations")
                         .HasForeignKey("LeadId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("Attendant");
 
                     b.Navigation("Lead");
                 });

@@ -10,5 +10,7 @@ public class LeadConversation
     public string ConversationState { get; set; } = "bot";
     public DateTime StartedAt { get; set; }
     public DateTime? EndedAt { get; set; }
+    public int? AttendantId { get; set; }
+    public Attendant? Attendant { get; set; }
     public ICollection<LeadInteraction> Interactions { get; set; } = [];
 }

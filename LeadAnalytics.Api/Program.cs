@@ -33,7 +33,7 @@ builder.Services.AddScoped<DailyRelatoryService>();
 builder.Services.AddScoped<LeadAttributionService>();
 builder.Services.AddScoped<MetaWebhookService>(); 
 builder.Services.AddScoped<ConfigurationService>();
-
+builder.Services.AddScoped<LeadAnalyticsService>();
 
 var app = builder.Build();
 
