@@ -862,7 +862,89 @@ public class LeadService(
             TrackingConfidence = lead.TrackingConfidence,
         };
     }
-}
+            // ═══════════════════════════════════════════════════════════════
+    // ADICIONAR NO LeadService.cs
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Obter leads ativos (não concluídos) para sincronização com n8n
+    /// </summary>
+    /// <param name="limit">Limite de leads a retornar (padrão: 100)</param>
+    /// <param name="unitId">Filtrar por unidade específica (opcional)</param>
+    /// <returns>Lista de leads ativos com dados mínimos</returns>
+    public async Task<List<ActiveLeadDto>> GetActiveLeadsAsync(int limit = 100, int? unitId = null)
+    {
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "📊 Buscando leads ativos (limite: {Limit}, unitId: {UnitId})", 
+                limit, unitId);
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // BUSCAR LEADS ATIVOS (NÃO CONCLUÍDOS)
+        // ─────────────────────────────────────────────────────────
+        
+        var query = _db.Leads
+            .AsNoTracking()
+            .Where(l => 
+                l.ConversationState != null &&
+                l.ConversationState != "concluido");
+
+        // Filtrar por unidade se especificado
+        if (unitId.HasValue)
+        {
+            query = query.Where(l => l.UnitId == unitId.Value);
+        }
+
+        var activeLeads = await query
+            .OrderBy(l => l.UpdatedAt) // Priorizar leads mais antigos sem atualização
+            .Take(limit)
+            .Select(l => new ActiveLeadDto
+            {
+                Id = l.Id,
+                ExternalId = l.ExternalId,
+                Name = l.Name,
+                Phone = l.Phone,
+                ConversationState = l.ConversationState!,
+                AttendantId = l.AttendantId,
+                UnitId = l.UnitId,
+                UpdatedAt = l.UpdatedAt,
+                CreatedAt = l.CreatedAt
+            })
+            .ToListAsync();
+
+        if (_logger.IsEnabled(LogLevel.Information))
+        {
+            _logger.LogInformation(
+                "✅ Retornados {Count} leads ativos para sincronização", 
+                activeLeads.Count);
+        }
+
+        return activeLeads;
+    }
+
+    /// <summary>
+    /// Obter contagem de leads por estado
+    /// </summary>
+    public async Task<Dictionary<string, int>> GetLeadsCountByStateAsync(int? unitId = null)
+    {
+        var query = _db.Leads.AsNoTracking();
+
+        if (unitId.HasValue)
+        {
+            query = query.Where(l => l.UnitId == unitId.Value);
+        }
+
+        var counts = await query
+            .Where(l => l.ConversationState != null)
+            .GroupBy(l => l.ConversationState)
+            .Select(g => new { State = g.Key!, Count = g.Count() })
+            .ToDictionaryAsync(x => x.State, x => x.Count);
+
+        return counts;
+    }
+    }
 
 public enum ProcessResult
 {

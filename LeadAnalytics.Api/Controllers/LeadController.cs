@@ -142,4 +142,106 @@ public class WebhooksController(
         var result = await _leadService.GetQueryLeadsByPeriodService(filtro);
         return Ok(result);
     }
+
+
+    /// <summary>
+    /// Obter leads ativos para sincronização com n8n
+    /// </summary>
+    /// <param name="limit">Limite de leads (padrão: 100, máx: 500)</param>
+    /// <param name="unitId">Filtrar por unidade específica</param>
+    /// <returns>Lista de leads ativos</returns>
+    [HttpGet("active")]
+    [ProducesResponseType(typeof(List<ActiveLeadDto>), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> GetActiveLeads(
+        [FromQuery] int limit = 100, 
+        [FromQuery] int? unitId = null)
+    {
+        try
+        {
+            // Validar limite
+            if (limit < 1 || limit > 500)
+            {
+                return BadRequest(new { 
+                    error = "Limite deve estar entre 1 e 500",
+                    limit = limit 
+                });
+            }
+ 
+            _logger.LogInformation(
+                "📊 GET /api/leads/active - limit={Limit}, unitId={UnitId}", 
+                limit, unitId);
+ 
+            var activeLeads = await _leadService.GetActiveLeadsAsync(limit, unitId);
+ 
+            return Ok(activeLeads);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Erro ao buscar leads ativos");
+            return StatusCode(500, new { 
+                error = "Erro ao buscar leads ativos",
+                message = ex.Message 
+            });
+        }
+    }
+ 
+    /// <summary>
+    /// Obter contagem de leads por estado
+    /// </summary>
+    /// <param name="unitId">Filtrar por unidade específica</param>
+    /// <returns>Contagem por estado</returns>
+    [HttpGet("count-by-state")]
+    [ProducesResponseType(typeof(LeadsCountDto), 200)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> GetLeadsCountByState([FromQuery] int? unitId = null)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "📊 GET /api/leads/count-by-state - unitId={UnitId}", 
+                unitId);
+ 
+            var counts = await _leadService.GetLeadsCountByStateAsync(unitId);
+ 
+            var response = new LeadsCountDto
+            {
+                Bot = counts.GetValueOrDefault("bot", 0),
+                Queue = counts.GetValueOrDefault("queue", 0),
+                Service = counts.GetValueOrDefault("service", 0),
+                Concluido = counts.GetValueOrDefault("concluido", 0),
+                Total = counts.Values.Sum()
+            };
+ 
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "❌ Erro ao contar leads por estado");
+            return StatusCode(500, new { 
+                error = "Erro ao contar leads",
+                message = ex.Message 
+            });
+        }
+    }
+ 
+    /// <summary>
+    /// Verificar saúde do endpoint de sincronização
+    /// </summary>
+    [HttpGet("sync/health")]
+    [ProducesResponseType(200)]
+    public IActionResult GetSyncHealth()
+    {
+        return Ok(new
+        {
+            status = "healthy",
+            timestamp = DateTime.UtcNow,
+            endpoints = new[]
+            {
+                "/api/leads/active - Leads ativos para sync",
+                "/api/leads/count-by-state - Contagem por estado"
+            }
+        });
+    }
 }
