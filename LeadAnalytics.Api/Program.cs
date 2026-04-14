@@ -35,6 +35,18 @@ builder.Services.AddScoped<MetaWebhookService>();
 builder.Services.AddScoped<ConfigurationService>();
 builder.Services.AddScoped<LeadAnalyticsService>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy
+            .AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
+
 var app = builder.Build();
 
 app.UseSwagger();
@@ -49,6 +61,7 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseAuthorization();
+app.UseCors("AllowAll");
 
 app.MapControllers();
 
