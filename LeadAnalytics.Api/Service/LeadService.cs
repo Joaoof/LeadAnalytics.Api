@@ -802,18 +802,14 @@ public class LeadService(
         var externalUserId = dto.AssignedUserId!.Value;
         var externalLeadId = dto.Customer!.Id;
         var tenantId = dto.Customer.ClinicId;
-        var conversationState = dto.Data?.ConversationState ?? "bot";
+        var conversationState = dto.Data?.ConversationState ?? "service";
 
-        var attendant = await _attendantService.GetOrCreateAsync(
-            externalUserId,
-            dto.AssignedUserName!,
-            dto.AssignedUserEmail,
-            tenantId
-            );
-
-        var lead = await _db.Leads.FirstOrDefaultAsync(l =>
+        var lead = await _db.Leads
+            .Include(l => l.Unit)  // ✅ CRÍTICO: Incluir Unit
+            .FirstOrDefaultAsync(l =>
             l.ExternalId == externalLeadId &&
             l.TenantId == tenantId);
+
 
         if (lead is null)
         {
@@ -825,6 +821,22 @@ public class LeadService(
                 Message = "Lead não encontrado"
             };
         }
+
+        if (!lead.UnitId.HasValue)
+        {
+            _logger.LogError(
+                "Lead {LeadId} não tem UnitId! Criando unit agora...", 
+                externalLeadId);
+            
+            var unit = await _unitService.GetOrCreateAsync(tenantId);
+            lead.UnitId = unit.Id;
+            await _db.SaveChangesAsync();
+        }
+        var attendant = await _attendantService.GetOrCreateAsync(
+            externalUserId,
+            dto.AssignedUserName!,
+            dto.AssignedUserEmail,
+            lead.UnitId!.Value);
 
         lead.AttendantId = attendant.Id;
         lead.UpdatedAt = DateTime.UtcNow;
