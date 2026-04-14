@@ -58,7 +58,7 @@ public class CloudiaLeadDataDto
     [JsonPropertyName("id_stage")]
     public int? IdStage { get; set; }
 
-    [JsonPropertyName("conversation_state")]
+    [JsonPropertyName("conversationState")]
     public string? ConversationState { get; set; }
 
     [JsonPropertyName("id_whatsapp")]
