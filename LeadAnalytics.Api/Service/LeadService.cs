@@ -187,7 +187,7 @@ public class LeadService(
             IdFacebookApp = dto.IdFacebookApp,
             HasHealthInsurancePlan = dto.HasHealthInsurancePlan,
             IdChannelIntegration = dto.IdChannelIntegration,
-            ConversationState = dto.ConversationState,
+            ConversationState = dto.ConversationState ?? "bot",
 
             // 🔥 ATRIBUIÇÃO (da Meta ou Cloudia)
             Source = source,
