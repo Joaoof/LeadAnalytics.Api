@@ -114,15 +114,15 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
     /// Obter métricas de múltiplos leads
     /// </summary>
     public async Task<List<LeadMetricsDto>> GetLeadsMetricsAsync(
-        int unitId,
+        int tenantId,
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? state = null)
     {
         var query = _context.Leads
-            .Include(l => l.Unit)
+            .Include(l => l.TenantId)
             .Include(l => l.Attendant)
-            .Where(l => l.UnitId == unitId);
+            .Where(l => l.TenantId == tenantId);
 
         if (startDate.HasValue)
             query = query.Where(l => l.CreatedAt >= startDate.Value);
