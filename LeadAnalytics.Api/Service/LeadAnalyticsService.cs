@@ -1,22 +1,41 @@
 using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs.Response;
+using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Service;
 
 /// <summary>
 /// Serviço para cálculo de métricas e analytics de leads
+/// Calcula tempos por estado, performance de atendentes e alertas
 /// </summary>
 public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsService> logger)
 {
     private readonly AppDbContext _context = context;
     private readonly ILogger<LeadAnalyticsService> _logger = logger;
 
+    // ═══════════════════════════════════════════════════════════════
+    // CONSTANTES - LIMITES DE TEMPO PARA ALERTAS
+    // ═══════════════════════════════════════════════════════════════
+    
+    private const int ALERTA_BOT_MINUTOS = 30;
+    private const int ALERTA_QUEUE_MINUTOS = 15;
+    private const int ALERTA_SERVICE_MINUTOS = 120;
+
+    // ═══════════════════════════════════════════════════════════════
+    // MÉTRICAS INDIVIDUAIS DE LEADS
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Obter métricas completas de um lead específico
+    /// Obter todas as métricas de um lead específico
+    /// Inclui: tempos por estado, timeline, alertas
     /// </summary>
     public async Task<LeadMetricsDto?> GetLeadMetricsAsync(int leadId)
     {
+        // ─────────────────────────────────────────────────────────
+        // 1. BUSCAR LEAD COM RELACIONAMENTOS
+        // ─────────────────────────────────────────────────────────
+        
         var lead = await _context.Leads
             .Include(l => l.Unit)
             .Include(l => l.Attendant)
@@ -28,64 +47,52 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
             return null;
         }
 
-        // Buscar todas as conversas (períodos de estado)
+        // ─────────────────────────────────────────────────────────
+        // 2. BUSCAR HISTÓRICO DE CONVERSAS (PERÍODOS DE ESTADO)
+        // ─────────────────────────────────────────────────────────
+        
         var conversations = await _context.LeadConversations
-            .Include(lc => lc.Attendant)
             .Where(lc => lc.LeadId == leadId)
             .OrderBy(lc => lc.StartedAt)
             .ToListAsync();
 
-        // Calcular tempo em cada estado
-        var timeInBot = conversations
-            .Where(c => c.ConversationState == "bot" && c.EndedAt.HasValue)
-            .Sum(c => (c.EndedAt!.Value - c.StartedAt).TotalMinutes);
-
-        var timeInQueue = conversations
-            .Where(c => c.ConversationState == "queue" && c.EndedAt.HasValue)
-            .Sum(c => (c.EndedAt!.Value - c.StartedAt).TotalMinutes);
-
-        var timeInService = conversations
-            .Where(c => c.ConversationState == "service" && c.EndedAt.HasValue)
-            .Sum(c => (c.EndedAt!.Value - c.StartedAt).TotalMinutes);
-
-        var timeInConcluido = conversations
-            .Where(c => c.ConversationState == "concluido" && c.EndedAt.HasValue)
-            .Sum(c => (c.EndedAt!.Value - c.StartedAt).TotalMinutes);
-
-        // Tempo até primeiro atendimento (bot/queue → service)
-        var firstServiceConversation = conversations
-            .FirstOrDefault(c => c.ConversationState == "service");
+        // ─────────────────────────────────────────────────────────
+        // 3. CALCULAR TEMPO EM CADA ESTADO
+        // ─────────────────────────────────────────────────────────
         
-        double? timeToFirstResponse = firstServiceConversation != null
-            ? (firstServiceConversation.StartedAt - lead.CreatedAt).TotalMinutes
-            : null;
+        var timeInBot = CalcularTempoNoEstado(conversations, "bot");
+        var timeInQueue = CalcularTempoNoEstado(conversations, "queue");
+        var timeInService = CalcularTempoNoEstado(conversations, "service");
+        var timeInConcluido = CalcularTempoNoEstado(conversations, "concluido");
 
-        // Tempo até resolução (criação → concluído)
-        var firstConcluidoConversation = conversations
-            .FirstOrDefault(c => c.ConversationState == "concluido");
+        // ─────────────────────────────────────────────────────────
+        // 4. CALCULAR TEMPO ATÉ PRIMEIRO ATENDIMENTO
+        // ─────────────────────────────────────────────────────────
+        
+        var timeToFirstResponse = CalcularTempoAteAtendimento(lead, conversations);
 
-        double? timeToResolution = firstConcluidoConversation != null
-            ? (firstConcluidoConversation.StartedAt - lead.CreatedAt).TotalMinutes
-            : null;
+        // ─────────────────────────────────────────────────────────
+        // 5. CALCULAR TEMPO ATÉ RESOLUÇÃO (CONCLUSÃO)
+        // ─────────────────────────────────────────────────────────
+        
+        var timeToResolution = CalcularTempoAteResolucao(lead, conversations);
 
-        // Verificar se está demorando (alertas)
-        var (isDelayed, delayReason) = CheckIfDelayed(lead, conversations);
+        // ─────────────────────────────────────────────────────────
+        // 6. VERIFICAR ALERTAS (DEMORANDO MUITO?)
+        // ─────────────────────────────────────────────────────────
+        
+        var (isDelayed, delayReason) = VerificarAlertas(lead, conversations);
 
-        // Timeline
-        var timeline = conversations.Select(c => new ConversationPeriodDto
-        {
-            ConversationId = c.Id,
-            State = c.ConversationState,
-            StartedAt = c.StartedAt,
-            EndedAt = c.EndedAt,
-            DurationMinutes = c.EndedAt.HasValue 
-                ? (c.EndedAt.Value - c.StartedAt).TotalMinutes 
-                : null,
-            AttendantId = c.AttendantId,
-            AttendantName = c.Attendant?.Name,
-            IsActive = !c.EndedAt.HasValue
-        }).ToList();
+        // ─────────────────────────────────────────────────────────
+        // 7. MONTAR TIMELINE DE CONVERSAS
+        // ─────────────────────────────────────────────────────────
+        
+        var timeline = MontarTimeline(conversations);
 
+        // ─────────────────────────────────────────────────────────
+        // 8. RETORNAR DTO COMPLETO
+        // ─────────────────────────────────────────────────────────
+        
         return new LeadMetricsDto
         {
             LeadId = lead.Id,
@@ -94,7 +101,7 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
             Phone = lead.Phone,
             CurrentState = lead.ConversationState ?? "desconhecido",
             CreatedAt = lead.CreatedAt,
-            LastUpdatedAt = lead.LastUpdatedAt,
+            LastUpdatedAt = lead.UpdatedAt, // ✅ CORRIGIDO: UpdatedAt, não LastUpdatedAt
             TimeInBotMinutes = timeInBot > 0 ? timeInBot : null,
             TimeInQueueMinutes = timeInQueue > 0 ? timeInQueue : null,
             TimeInServiceMinutes = timeInService > 0 ? timeInService : null,
@@ -111,35 +118,53 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
     }
 
     /// <summary>
-    /// Obter métricas de múltiplos leads
+    /// Obter métricas de múltiplos leads com filtros
     /// </summary>
     public async Task<List<LeadMetricsDto>> GetLeadsMetricsAsync(
-        int tenantId,
+        int unitId,
         DateTime? startDate = null,
         DateTime? endDate = null,
         string? state = null)
     {
+        // ─────────────────────────────────────────────────────────
+        // BUSCAR LEADS COM FILTROS
+        // ─────────────────────────────────────────────────────────
+        
         var query = _context.Leads
-            .Include(l => l.TenantId)
-            .Include(l => l.Attendant)
-            .Where(l => l.TenantId == tenantId);
+            .Include(l => l.Unit)      // ✅ Unit é navegação
+            .Include(l => l.Attendant) // ✅ Attendant é navegação
+            .Where(l => l.UnitId == unitId); // ✅ CORRIGIDO: UnitId ao invés de TenantId
 
+        // Filtro de data inicial
         if (startDate.HasValue)
+        {
             query = query.Where(l => l.CreatedAt >= startDate.Value);
+        }
 
+        // Filtro de data final
         if (endDate.HasValue)
+        {
             query = query.Where(l => l.CreatedAt <= endDate.Value);
+        }
 
+        // Filtro de estado
         if (!string.IsNullOrEmpty(state))
+        {
             query = query.Where(l => l.ConversationState == state);
+        }
 
         var leads = await query.ToListAsync();
 
+        // ─────────────────────────────────────────────────────────
+        // CALCULAR MÉTRICAS DE CADA LEAD
+        // ─────────────────────────────────────────────────────────
+        
         var metrics = new List<LeadMetricsDto>();
 
         foreach (var lead in leads)
         {
             var leadMetrics = await GetLeadMetricsAsync(lead.Id);
+            
             if (leadMetrics != null)
             {
                 metrics.Add(leadMetrics);
@@ -149,69 +174,96 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
         return metrics;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // RESUMO AGREGADO DA CLÍNICA
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Obter resumo agregado da clínica
+    /// Obter resumo com médias e totais da clínica
     /// </summary>
     public async Task<ClinicSummaryDto> GetClinicSummaryAsync(
         int unitId,
         DateTime? startDate = null,
         DateTime? endDate = null)
     {
+        // ─────────────────────────────────────────────────────────
+        // 1. DEFINIR PERÍODO (PADRÃO: ÚLTIMOS 30 DIAS)
+        // ─────────────────────────────────────────────────────────
+        
         var start = startDate ?? DateTime.UtcNow.Date.AddDays(-30);
         var end = endDate ?? DateTime.UtcNow;
 
-        var unit = await _context.Units.FindAsync(unitId) ?? throw new ArgumentException($"Unidade {unitId} não encontrada");
+        // ─────────────────────────────────────────────────────────
+        // 2. BUSCAR UNIDADE (OPCIONAL - USA NOME GENÉRICO SE NÃO EXISTIR)
+        // ─────────────────────────────────────────────────────────
+        
+        var unit = await _context.Units.FindAsync(unitId);
+        var unitName = unit?.Name ?? $"Unidade {unitId}";
 
-        // Total de leads no período
+        // ─────────────────────────────────────────────────────────
+        // 3. CONTAR TOTAL DE LEADS NO PERÍODO
+        // ─────────────────────────────────────────────────────────
+        
         var leadsQuery = _context.Leads
-            .Where(l => l.UnitId == unitId && l.CreatedAt >= start && l.CreatedAt <= end);
+            .Where(l => l.UnitId == unitId 
+                && l.CreatedAt >= start 
+                && l.CreatedAt <= end);
 
         var totalLeads = await leadsQuery.CountAsync();
 
+        // ─────────────────────────────────────────────────────────
+        // 4. DISTRIBUIÇÃO POR ESTADO
+        // ─────────────────────────────────────────────────────────
+        
         var leadsByState = await leadsQuery
+            .Where(l => l.ConversationState != null)
             .GroupBy(l => l.ConversationState)
-            .Where(g => g.Key != null)
-            .Select(g => new { State = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(x => x.State!, x => x.Count);
+            .Select(g => new { State = g.Key!, Count = g.Count() })
+            .ToDictionaryAsync(x => x.State, x => x.Count);
 
         var leadsInBot = leadsByState.GetValueOrDefault("bot", 0);
         var leadsInQueue = leadsByState.GetValueOrDefault("queue", 0);
         var leadsInService = leadsByState.GetValueOrDefault("service", 0);
         var leadsConcluded = leadsByState.GetValueOrDefault("concluido", 0);
 
-        // Obter métricas de todos os leads
+        // ─────────────────────────────────────────────────────────
+        // 5. CALCULAR MÉTRICAS AGREGADAS
+        // ─────────────────────────────────────────────────────────
+        
         var allMetrics = await GetLeadsMetricsAsync(unitId, start, end);
 
-        // Calcular médias
-        var avgTimeToFirstResponse = allMetrics
-            .Where(m => m.TimeToFirstResponseMinutes.HasValue)
-            .Average(m => m.TimeToFirstResponseMinutes);
+        var avgTimeToFirstResponse = CalcularMedia(
+            allMetrics.Select(m => m.TimeToFirstResponseMinutes));
 
-        var avgTimeToResolution = allMetrics
-            .Where(m => m.TimeToResolutionMinutes.HasValue)
-            .Average(m => m.TimeToResolutionMinutes);
+        var avgTimeToResolution = CalcularMedia(
+            allMetrics.Select(m => m.TimeToResolutionMinutes));
 
-        var avgTimeInBot = allMetrics
-            .Where(m => m.TimeInBotMinutes.HasValue)
-            .Average(m => m.TimeInBotMinutes);
+        var avgTimeInBot = CalcularMedia(
+            allMetrics.Select(m => m.TimeInBotMinutes));
 
-        var avgTimeInQueue = allMetrics
-            .Where(m => m.TimeInQueueMinutes.HasValue)
-            .Average(m => m.TimeInQueueMinutes);
+        var avgTimeInQueue = CalcularMedia(
+            allMetrics.Select(m => m.TimeInQueueMinutes));
 
-        var avgTimeInService = allMetrics
-            .Where(m => m.TimeInServiceMinutes.HasValue)
-            .Average(m => m.TimeInServiceMinutes);
+        var avgTimeInService = CalcularMedia(
+            allMetrics.Select(m => m.TimeInServiceMinutes));
 
         var delayedCount = allMetrics.Count(m => m.IsDelayed);
 
-        // Performance por atendente
-        var attendantsPerformance = await GetAttendantsPerformanceAsync(unitId, start, end);
+        // ─────────────────────────────────────────────────────────
+        // 6. PERFORMANCE DE ATENDENTES
+        // ─────────────────────────────────────────────────────────
+        
+        var attendantsPerformance = await GetAttendantsPerformanceAsync(
+            unitId, start, end);
 
+        // ─────────────────────────────────────────────────────────
+        // 7. RETORNAR RESUMO COMPLETO
+        // ─────────────────────────────────────────────────────────
+        
         return new ClinicSummaryDto
         {
             ClinicId = unitId,
-            ClinicName = unit.Name,
+            ClinicName = unitName,
             PeriodStart = start,
             PeriodEnd = end,
             TotalLeads = totalLeads,
@@ -231,64 +283,82 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
         };
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // PERFORMANCE DE ATENDENTES
+    // ═══════════════════════════════════════════════════════════════
+
     /// <summary>
-    /// Obter performance de atendentes
+    /// Calcular performance de cada atendente no período
     /// </summary>
     private async Task<List<AttendantPerformanceDto>> GetAttendantsPerformanceAsync(
         int unitId,
         DateTime startDate,
         DateTime endDate)
     {
+        // ─────────────────────────────────────────────────────────
+        // BUSCAR TODOS OS ATENDENTES DA UNIDADE
+        // ─────────────────────────────────────────────────────────
+        
         var attendants = await _context.Attendants
             .Where(a => a.UnitId == unitId)
             .ToListAsync();
 
         var performance = new List<AttendantPerformanceDto>();
 
+        // ─────────────────────────────────────────────────────────
+        // CALCULAR MÉTRICAS DE CADA ATENDENTE
+        // ─────────────────────────────────────────────────────────
+        
         foreach (var attendant in attendants)
         {
-            // Leads atendidos
-            var handledLeads = await _context.LeadConversations
-                .Include(lc => lc.Lead)
-                .Where(lc => lc.AttendantId == attendant.Id 
-                    && lc.Lead.UnitId == unitId
-                    && lc.StartedAt >= startDate 
-                    && lc.StartedAt <= endDate)
+            // Leads atribuídos a este atendente (via LeadAssignment)
+            var assignedLeadIds = await _context.Set<LeadAssignment>()
+                .Where(la => la.AttendantId == attendant.Id
+                    && la.AssignedAt >= startDate
+                    && la.AssignedAt <= endDate)
+                .Select(la => la.LeadId)
+                .Distinct()
                 .ToListAsync();
 
-            var totalHandled = handledLeads.Select(lc => lc.LeadId).Distinct().Count();
+            var totalHandled = assignedLeadIds.Count;
 
-            // Leads atualmente ativos
+            // Leads atualmente em atendimento
             var currentActive = await _context.Leads
                 .CountAsync(l => l.AttendantId == attendant.Id 
                     && l.ConversationState == "service");
 
             // Leads concluídos
-            var concluded = await _context.LeadConversations
-                .Include(lc => lc.Lead)
-                .Where(lc => lc.AttendantId == attendant.Id
-                    && lc.ConversationState == "concluido"
-                    && lc.Lead.UnitId == unitId
-                    && lc.StartedAt >= startDate
-                    && lc.StartedAt <= endDate)
-                .Select(lc => lc.LeadId)
-                .Distinct()
-                .CountAsync();
+            var concluded = await _context.Leads
+                .CountAsync(l => assignedLeadIds.Contains(l.Id)
+                    && l.ConversationState == "concluido");
 
-            // Tempo médio de atendimento
-            var avgServiceTime = handledLeads
-                .Where(lc => lc.ConversationState == "service" && lc.EndedAt.HasValue)
-                .Select(lc => (lc.EndedAt!.Value - lc.StartedAt).TotalMinutes)
-                .DefaultIfEmpty(0)
-                .Average();
+            // Tempo médio em atendimento (service)
+            var serviceConversations = await _context.LeadConversations
+                .Where(lc => assignedLeadIds.Contains(lc.LeadId)
+                    && lc.ConversationState == "service"
+                    && lc.EndedAt.HasValue)
+                .ToListAsync();
 
-            // Tempo médio até conclusão
-            var avgResolutionTime = handledLeads
-                .Where(lc => lc.ConversationState == "concluido" && lc.EndedAt.HasValue)
-                .Select(lc => (lc.EndedAt!.Value - lc.StartedAt).TotalMinutes)
-                .DefaultIfEmpty(0)
-                .Average();
+            var avgServiceTime = serviceConversations.Any()
+                ? serviceConversations
+                    .Select(lc => (lc.EndedAt!.Value - lc.StartedAt).TotalMinutes)
+                    .Average()
+                : 0;
 
+            // Tempo médio até resolução
+            var concludedLeads = await _context.Leads
+                .Where(l => assignedLeadIds.Contains(l.Id)
+                    && l.ConversationState == "concluido"
+                    && l.ConvertedAt.HasValue)
+                .ToListAsync();
+
+            var avgResolutionTime = concludedLeads.Any()
+                ? concludedLeads
+                    .Select(l => (l.ConvertedAt!.Value - l.CreatedAt).TotalMinutes)
+                    .Average()
+                : 0;
+
+            // Taxa de conversão
             var conversionRate = totalHandled > 0 
                 ? (double)concluded / totalHandled 
                 : 0;
@@ -306,56 +376,134 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
             });
         }
 
-        return performance.OrderByDescending(p => p.TotalLeadsHandled).ToList();
+        return performance
+            .OrderByDescending(p => p.TotalLeadsHandled)
+            .ToList();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // ALERTAS E LEADS ATRASADOS
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Obter apenas leads com alertas (demorando muito)
+    /// </summary>
+    public async Task<List<LeadMetricsDto>> GetDelayedLeadsAsync(int unitId)
+    {
+        var allMetrics = await GetLeadsMetricsAsync(unitId);
+        return allMetrics.Where(m => m.IsDelayed).ToList();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // MÉTODOS AUXILIARES (CÁLCULOS E VALIDAÇÕES)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Calcular tempo total que o lead ficou em um estado específico
+    /// </summary>
+    private static double CalcularTempoNoEstado(
+        List<LeadConversation> conversations, 
+        string estado)
+    {
+        return conversations
+            .Where(c => c.ConversationState == estado && c.EndedAt.HasValue)
+            .Sum(c => (c.EndedAt!.Value - c.StartedAt).TotalMinutes);
     }
 
     /// <summary>
-    /// Verificar se lead está demorando muito
+    /// Calcular tempo até primeiro atendimento humano (bot/queue → service)
     /// </summary>
-    private (bool IsDelayed, string? Reason) CheckIfDelayed(
-        Models.Lead lead,
-        List<Models.LeadConversation> conversations)
+    private static double? CalcularTempoAteAtendimento(
+        Lead lead, 
+        List<LeadConversation> conversations)
+    {
+        var firstService = conversations
+            .FirstOrDefault(c => c.ConversationState == "service");
+
+        return firstService != null
+            ? (firstService.StartedAt - lead.CreatedAt).TotalMinutes
+            : null;
+    }
+
+    /// <summary>
+    /// Calcular tempo até resolução completa (criação → concluído)
+    /// </summary>
+    private static double? CalcularTempoAteResolucao(
+        Lead lead,
+        List<LeadConversation> conversations)
+    {
+        var firstConcluido = conversations
+            .FirstOrDefault(c => c.ConversationState == "concluido");
+
+        return firstConcluido != null
+            ? (firstConcluido.StartedAt - lead.CreatedAt).TotalMinutes
+            : null;
+    }
+
+    /// <summary>
+    /// Verificar se lead está demorando muito (alertas)
+    /// </summary>
+    private (bool IsDelayed, string? Reason) VerificarAlertas(
+        Lead lead,
+        List<LeadConversation> conversations)
     {
         var now = DateTime.UtcNow;
 
-        // Lead em BOT há mais de 30 minutos
+        // ─────────────────────────────────────────────────────────
+        // ALERTA: BOT (> 30 MINUTOS)
+        // ─────────────────────────────────────────────────────────
+        
         if (lead.ConversationState == "bot")
         {
-            var currentBotTime = (now - lead.CreatedAt).TotalMinutes;
-            if (currentBotTime > 30)
+            var tempoEmBot = (now - lead.CreatedAt).TotalMinutes;
+            
+            if (tempoEmBot > ALERTA_BOT_MINUTOS)
             {
-                return (true, $"Em BOT há {currentBotTime:F0} minutos (limite: 30min)");
+                return (true, 
+                    $"Em BOT há {tempoEmBot:F0} minutos (limite: {ALERTA_BOT_MINUTOS}min)");
             }
         }
 
-        // Lead em QUEUE há mais de 15 minutos
+        // ─────────────────────────────────────────────────────────
+        // ALERTA: QUEUE (> 15 MINUTOS)
+        // ─────────────────────────────────────────────────────────
+        
         if (lead.ConversationState == "queue")
         {
-            var currentQueueConv = conversations
-                .FirstOrDefault(c => c.ConversationState == "queue" && !c.EndedAt.HasValue);
+            var conversaAtual = conversations
+                .FirstOrDefault(c => c.ConversationState == "queue" 
+                    && !c.EndedAt.HasValue);
 
-            if (currentQueueConv != null)
+            if (conversaAtual != null)
             {
-                var queueTime = (now - currentQueueConv.StartedAt).TotalMinutes;
-                if (queueTime > 15)
+                var tempoEmFila = (now - conversaAtual.StartedAt).TotalMinutes;
+                
+                if (tempoEmFila > ALERTA_QUEUE_MINUTOS)
                 {
-                    return (true, $"Na fila há {queueTime:F0} minutos (limite: 15min)");
+                    return (true, 
+                        $"Na fila há {tempoEmFila:F0} minutos (limite: {ALERTA_QUEUE_MINUTOS}min)");
                 }
             }
         }
 
-        // Lead em SERVICE há mais de 2 horas
+        // ─────────────────────────────────────────────────────────
+        // ALERTA: SERVICE (> 120 MINUTOS / 2 HORAS)
+        // ─────────────────────────────────────────────────────────
+        
         if (lead.ConversationState == "service")
         {
-            var currentServiceConv = conversations
-                .FirstOrDefault(c => c.ConversationState == "service" && !c.EndedAt.HasValue);
+            var conversaAtual = conversations
+                .FirstOrDefault(c => c.ConversationState == "service" 
+                    && !c.EndedAt.HasValue);
 
-            if (currentServiceConv != null)
+            if (conversaAtual != null)
             {
-                var serviceTime = (now - currentServiceConv.StartedAt).TotalMinutes;
-                if (serviceTime > 120)
+                var tempoEmAtendimento = (now - conversaAtual.StartedAt).TotalMinutes;
+                
+                if (tempoEmAtendimento > ALERTA_SERVICE_MINUTOS)
                 {
-                    return (true, $"Em atendimento há {serviceTime:F0} minutos (limite: 120min)");
+                    return (true, 
+                        $"Em atendimento há {tempoEmAtendimento:F0} minutos (limite: {ALERTA_SERVICE_MINUTOS}min)");
                 }
             }
         }
@@ -364,11 +512,35 @@ public class LeadAnalyticsService(AppDbContext context, ILogger<LeadAnalyticsSer
     }
 
     /// <summary>
-    /// Obter leads com alertas (demorando muito)
+    /// Montar timeline de conversas para exibição
     /// </summary>
-    public async Task<List<LeadMetricsDto>> GetDelayedLeadsAsync(int unitId)
+    private static List<ConversationPeriodDto> MontarTimeline(
+        List<LeadConversation> conversations)
     {
-        var allMetrics = await GetLeadsMetricsAsync(unitId);
-        return [.. allMetrics.Where(m => m.IsDelayed)];
+        return conversations.Select(c => new ConversationPeriodDto
+        {
+            ConversationId = c.Id,
+            State = c.ConversationState,
+            StartedAt = c.StartedAt,
+            EndedAt = c.EndedAt,
+            DurationMinutes = c.EndedAt.HasValue
+                ? (c.EndedAt.Value - c.StartedAt).TotalMinutes
+                : null,
+            AttendantId = null, // LeadConversation não rastreia atendente
+            AttendantName = null,
+            IsActive = !c.EndedAt.HasValue
+        }).ToList();
+    }
+
+    /// <summary>
+    /// Calcular média de valores nullable (ignora nulls)
+    /// </summary>
+    private static double? CalcularMedia(IEnumerable<double?> valores)
+    {
+        var valoresValidos = valores.Where(v => v.HasValue).Select(v => v!.Value).ToList();
+        
+        return valoresValidos.Any() 
+            ? valoresValidos.Average() 
+            : null;
     }
 }
