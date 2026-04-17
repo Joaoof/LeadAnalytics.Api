@@ -32,6 +32,39 @@ public class WebhooksController(
         var result = await _leadService.SaveLeadAsync(dto);
         return Ok(result);
     }
+    [HttpGet("/webhooks/total-leads")]
+    public async Task<IActionResult> GetTotalLeads(int clinicId)
+    {
+        var total = await _leadService.GetLeadsTotal(clinicId);
+
+        return Ok(new TotalLeadsDto
+        {
+            Total = total
+        });
+    }
+    /// <summary>
+    /// Contar quantos leads estão em atendimento
+    /// </summary>
+    /// <param name="unitId">Filtrar por unidade (opcional)</param>
+    /// <returns>Número de leads em atendimento</returns>
+    [HttpGet("in-service/count")]
+    public async Task<IActionResult> GetInServiceCount([FromQuery] int? unitId = null)
+    {
+        var count = await _leadService.GetLeadsInServiceCountAsync(unitId);
+        return Ok(new { inService = count });
+    }
+
+    /// <summary>
+    /// Contar leads em cada estado (detalhado)
+    /// </summary>
+    /// <param name="unitId">Filtrar por unidade (opcional)</param>
+    /// <returns>Contagem por estado</returns>
+    [HttpGet("in-service/details")]
+    public async Task<IActionResult> GetInServiceDetails([FromQuery] int? unitId = null)
+    {
+        var details = await _leadService.GetLeadsInServiceDetailsAsync(unitId);
+        return Ok(details);
+    }
 
     [HttpGet("consultas")]
     public async Task<IActionResult> GetHasAppoiment(int clinicId)

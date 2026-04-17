@@ -2,6 +2,8 @@ using System.Security.Claims;
 using LeadAnalytics.Api.DTOs.Auth;
 using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Authorization;
+using LeadAnalytics.Api.DTOs.Auth;
+using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LeadAnalytics.Api.Controllers;

@@ -3,6 +3,7 @@ using LeadAnalytics.Api.DTOs.Cloudia;
 using LeadAnalytics.Api.DTOs.Response;
 using LeadAnalytics.Api.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Security.AccessControl;
 using System.Text.Json;
 
 namespace LeadAnalytics.Api.Service;
@@ -527,7 +528,73 @@ public class LeadService(
         };
     }
 
-    // ... resto dos métodos permanecem iguais ...
+   public async Task<int> GetLeadsTotal(int? clinicId)
+    {
+        return await _db.Leads.AsNoTracking()
+        .Where(l => !clinicId.HasValue || l.TenantId == clinicId.Value).CountAsync();
+    }
+    
+    /// <summary>
+    /// Contar leads em atendimento (estado "service")
+    /// </summary>
+    public async Task<int> GetLeadsInServiceCountAsync(int? unitId = null)
+    {
+        var query = _db.Leads
+            .AsNoTracking()
+            .Where(l => l.ConversationState == "service");
+
+        // Filtrar por unidade se especificado
+        if (unitId.HasValue)
+        {
+            query = query.Where(l => l.UnitId == unitId.Value);
+        }
+
+        var count = await query.CountAsync();
+
+        _logger.LogInformation(
+            "📊 Leads em atendimento: {Count} (unitId: {UnitId})", 
+            count, unitId);
+
+        return count;
+    }
+
+    /// <summary>
+    /// Contar leads em cada estado
+    /// </summary>
+    public async Task<LeadsInServiceDto> GetLeadsInServiceDetailsAsync(int? unitId = null)
+    {
+        var query = _db.Leads.AsNoTracking();
+
+        if (unitId.HasValue)
+        {
+            query = query.Where(l => l.UnitId == unitId.Value);
+        }
+
+        var inService = await query
+            .Where(l => l.ConversationState == "service")
+            .CountAsync();
+
+        var inQueue = await query
+            .Where(l => l.ConversationState == "queue")
+            .CountAsync();
+
+        var inBot = await query
+            .Where(l => l.ConversationState == "bot")
+            .CountAsync();
+
+        var concluded = await query
+            .Where(l => l.ConversationState == "concluido")
+            .CountAsync();
+
+        return new LeadsInServiceDto
+        {
+            InService = inService,
+            InQueue = inQueue,
+            InBot = inBot,
+            Concluded = concluded,
+            TotalActive = inService + inQueue + inBot
+        };
+    }
 
     public async Task<int> GetCheckClosedQueries(int clinicId)
     {

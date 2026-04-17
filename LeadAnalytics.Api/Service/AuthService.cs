@@ -5,6 +5,10 @@ using Microsoft.Extensions.Options;
 namespace LeadAnalytics.Api.Service;
 
 public class AuthService(IOptions<AuthOptions> authOptions, JwtTokenService jwtTokenService)
+
+namespace LeadAnalytics.Api.Service;
+
+public class AuthService
 {
     private const int AraguainaUnitId = 1;
     private const int AraguainaClinicId = 8020;
@@ -28,6 +32,48 @@ public class AuthService(IOptions<AuthOptions> authOptions, JwtTokenService jwtT
         new UnitSelectorOptionDto { Id = 5, ClinicId = 8024, Name = "DOUTOR HÉRNIA CANAÃ", LogoUrl = "/assets/logo-10anos.png" },
         new UnitSelectorOptionDto { Id = 6, ClinicId = 8025, Name = "DOUTOR HÉRNIA BALSAS", LogoUrl = "/assets/logo-10anos.png" },
         new UnitSelectorOptionDto { Id = 7, ClinicId = 8026, Name = "INSTITUTO TRAUMA", LogoUrl = "/assets/logo-trauma.png" }
+        new UnitSelectorOptionDto
+        {
+            Id = 2,
+            ClinicId = 8021,
+            Name = "DOUTOR HÉRNIA UNIDADE MARABÁ",
+            LogoUrl = "/assets/logo-maraba.png"
+        },
+        new UnitSelectorOptionDto
+        {
+            Id = 3,
+            ClinicId = 8022,
+            Name = "DOUTOR HÉRNIA UNIDADE PARAUAPEBAS",
+            LogoUrl = "/assets/logo-parauapebas.png"
+        },
+        new UnitSelectorOptionDto
+        {
+            Id = 4,
+            ClinicId = 8023,
+            Name = "DOUTOR HÉRNIA IMPERATRIZ",
+            LogoUrl = "/assets/logo-10anos.png"
+        },
+        new UnitSelectorOptionDto
+        {
+            Id = 5,
+            ClinicId = 8024,
+            Name = "DOUTOR HÉRNIA CANAÃ",
+            LogoUrl = "/assets/logo-10anos.png"
+        },
+        new UnitSelectorOptionDto
+        {
+            Id = 6,
+            ClinicId = 8025,
+            Name = "DOUTOR HÉRNIA BALSAS",
+            LogoUrl = "/assets/logo-10anos.png"
+        },
+        new UnitSelectorOptionDto
+        {
+            Id = 7,
+            ClinicId = 8026,
+            Name = "INSTITUTO TRAUMA",
+            LogoUrl = "/assets/logo-trauma.png"
+        }
     ];
 
     public IReadOnlyCollection<UnitSelectorOptionDto> GetUnitOptions() => DefaultUnits;
@@ -51,6 +97,11 @@ public class AuthService(IOptions<AuthOptions> authOptions, JwtTokenService jwtT
         var selectedUnit = availableUnits.First();
 
         var (token, expiresAtUtc) = _jwtTokenService.GenerateToken(request, role, availableUnits);
+        var userName = string.IsNullOrWhiteSpace(request.Name)
+            ? "Usuário Cloudia"
+            : request.Name.Trim();
+
+        var selectedUnit = DefaultUnits.First(u => u.Id == AraguainaUnitId && u.ClinicId == AraguainaClinicId);
 
         return new LoginResponseDto
         {
@@ -82,5 +133,10 @@ public class AuthService(IOptions<AuthOptions> authOptions, JwtTokenService jwtT
         }
 
         return emails;
+    }
+            Email = request.Email,
+            SelectedUnit = selectedUnit,
+            AvailableUnits = [.. DefaultUnits]
+        };
     }
 }
