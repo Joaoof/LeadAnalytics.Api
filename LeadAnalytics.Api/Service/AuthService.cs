@@ -1,142 +1,164 @@
+using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs.Auth;
-using LeadAnalytics.Api.Options;
-using Microsoft.Extensions.Options;
-
-namespace LeadAnalytics.Api.Service;
-
-public class AuthService(IOptions<AuthOptions> authOptions, JwtTokenService jwtTokenService)
+using LeadAnalytics.Api.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Service;
 
 public class AuthService
 {
-    private const int AraguainaUnitId = 1;
-    private const int AraguainaClinicId = 8020;
+    private readonly AppDbContext _db;
+    private readonly JwtTokenService _jwtTokenService;
+    private readonly ILogger<AuthService> _logger;
 
-    private readonly AuthOptions _authOptions = authOptions.Value;
-    private readonly JwtTokenService _jwtTokenService = jwtTokenService;
-
-    private static readonly List<UnitSelectorOptionDto> DefaultUnits =
-    [
-        new UnitSelectorOptionDto
-        {
-            Id = 1,
-            ClinicId = 8020,
-            Name = "Doutor Hérnia Unidade Araguaína",
-            LogoUrl = "https://i0.wp.com/www.cloudia.com.br/wp-content/uploads/2024/01/Logo-800-sem-fundo.png",
-            IsDefault = true
-        },
-        new UnitSelectorOptionDto { Id = 2, ClinicId = 8021, Name = "DOUTOR HÉRNIA UNIDADE MARABÁ", LogoUrl = "/assets/logo-maraba.png" },
-        new UnitSelectorOptionDto { Id = 3, ClinicId = 8022, Name = "DOUTOR HÉRNIA UNIDADE PARAUAPEBAS", LogoUrl = "/assets/logo-parauapebas.png" },
-        new UnitSelectorOptionDto { Id = 4, ClinicId = 8023, Name = "DOUTOR HÉRNIA IMPERATRIZ", LogoUrl = "/assets/logo-10anos.png" },
-        new UnitSelectorOptionDto { Id = 5, ClinicId = 8024, Name = "DOUTOR HÉRNIA CANAÃ", LogoUrl = "/assets/logo-10anos.png" },
-        new UnitSelectorOptionDto { Id = 6, ClinicId = 8025, Name = "DOUTOR HÉRNIA BALSAS", LogoUrl = "/assets/logo-10anos.png" },
-        new UnitSelectorOptionDto { Id = 7, ClinicId = 8026, Name = "INSTITUTO TRAUMA", LogoUrl = "/assets/logo-trauma.png" }
-        new UnitSelectorOptionDto
-        {
-            Id = 2,
-            ClinicId = 8021,
-            Name = "DOUTOR HÉRNIA UNIDADE MARABÁ",
-            LogoUrl = "/assets/logo-maraba.png"
-        },
-        new UnitSelectorOptionDto
-        {
-            Id = 3,
-            ClinicId = 8022,
-            Name = "DOUTOR HÉRNIA UNIDADE PARAUAPEBAS",
-            LogoUrl = "/assets/logo-parauapebas.png"
-        },
-        new UnitSelectorOptionDto
-        {
-            Id = 4,
-            ClinicId = 8023,
-            Name = "DOUTOR HÉRNIA IMPERATRIZ",
-            LogoUrl = "/assets/logo-10anos.png"
-        },
-        new UnitSelectorOptionDto
-        {
-            Id = 5,
-            ClinicId = 8024,
-            Name = "DOUTOR HÉRNIA CANAÃ",
-            LogoUrl = "/assets/logo-10anos.png"
-        },
-        new UnitSelectorOptionDto
-        {
-            Id = 6,
-            ClinicId = 8025,
-            Name = "DOUTOR HÉRNIA BALSAS",
-            LogoUrl = "/assets/logo-10anos.png"
-        },
-        new UnitSelectorOptionDto
-        {
-            Id = 7,
-            ClinicId = 8026,
-            Name = "INSTITUTO TRAUMA",
-            LogoUrl = "/assets/logo-trauma.png"
-        }
-    ];
-
-    public IReadOnlyCollection<UnitSelectorOptionDto> GetUnitOptions() => DefaultUnits;
-
-    public LoginResponseDto Login(LoginRequestDto request)
+    public AuthService(
+        AppDbContext db,
+        JwtTokenService jwtTokenService,
+        ILogger<AuthService> logger)
     {
-        var userName = string.IsNullOrWhiteSpace(request.Name) ? "Usuário Cloudia" : request.Name.Trim();
-        var email = request.Email?.Trim().ToLowerInvariant();
+        _db = db;
+        _jwtTokenService = jwtTokenService;
+        _logger = logger;
+    }
 
-        var adminEmails = ResolveSuperAdminEmails();
+    public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Email) ||
+            string.IsNullOrWhiteSpace(request.Password))
+        {
+            _logger.LogWarning("❌ Login sem email ou senha");
+            return null;
+        }
 
-        var isSuperAdmin = !string.IsNullOrWhiteSpace(email)
-            && adminEmails.Contains(email, StringComparer.OrdinalIgnoreCase);
+        var email = request.Email.Trim().ToLowerInvariant();
 
-        var role = isSuperAdmin ? "super-admin" : "user";
+        var user = await _db.Users
+            .Include(u => u.Unit)
+            .FirstOrDefaultAsync(u => u.Email == email);
 
-        var availableUnits = isSuperAdmin
-            ? [.. DefaultUnits]
-            : [DefaultUnits.First(u => u.Id == AraguainaUnitId && u.ClinicId == AraguainaClinicId)];
+        if (user == null)
+        {
+            _logger.LogWarning("❌ Usuário não encontrado: {Email}", email);
+            return null;
+        }
 
-        var selectedUnit = availableUnits.First();
+        if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+        {
+            _logger.LogWarning("❌ Senha incorreta: {Email}", email);
+            await HandleFailedLoginAsync(user);
+            return null;
+        }
 
-        var (token, expiresAtUtc) = _jwtTokenService.GenerateToken(request, role, availableUnits);
-        var userName = string.IsNullOrWhiteSpace(request.Name)
-            ? "Usuário Cloudia"
-            : request.Name.Trim();
+        if (user.LockedUntil.HasValue && user.LockedUntil > DateTime.UtcNow)
+        {
+            _logger.LogWarning("🔒 Usuário bloqueado: {Email}", email);
+            return null;
+        }
 
-        var selectedUnit = DefaultUnits.First(u => u.Id == AraguainaUnitId && u.ClinicId == AraguainaClinicId);
+        if (!user.IsActive)
+        {
+            _logger.LogWarning("⛔ Usuário inativo: {Email}", email);
+            return null;
+        }
+
+        var availableUnits = await GetUserUnitsAsync(user);
+
+        if (availableUnits.Count == 0)
+        {
+            _logger.LogWarning("❌ Usuário sem unidades: {Email}", email);
+            return null;
+        }
+
+        var (accessToken, expiresAtUtc) = _jwtTokenService.GenerateToken(
+            user,
+            availableUnits);
+
+        var refreshToken = GenerateRefreshToken();
+
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(30);
+        user.LastLoginAt = DateTime.UtcNow;
+        user.FailedLoginAttempts = 0;
+        user.LockedUntil = null;
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("✅ Login bem-sucedido: {Email} ({Role})", email, user.Role);
 
         return new LoginResponseDto
         {
-            UserName = userName,
-            Email = email,
-            Role = role,
+            UserName = user.Name,
+            Email = user.Email,
+            Role = user.Role,
             TokenType = "Bearer",
-            AccessToken = token,
+            AccessToken = accessToken,
+            RefreshToken = refreshToken,
             ExpiresAtUtc = expiresAtUtc,
-            SelectedUnit = selectedUnit,
+            SelectedUnit = availableUnits.First(),
             AvailableUnits = availableUnits
         };
     }
 
-    private HashSet<string> ResolveSuperAdminEmails()
+    private async Task<List<UnitSelectorOptionDto>> GetUserUnitsAsync(User user)
     {
-        var emails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        IQueryable<Unit> query;
 
-        foreach (var email in _authOptions.SuperAdminEmails.Where(e => !string.IsNullOrWhiteSpace(e)))
-            emails.Add(email.Trim().ToLowerInvariant());
-
-        if (!string.IsNullOrWhiteSpace(_authOptions.SuperAdminEmailsCsv))
+        if (user.Role == "super_admin")
         {
-            var fromCsv = _authOptions.SuperAdminEmailsCsv
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            query = _db.Units.AsNoTracking();
 
-            foreach (var email in fromCsv.Where(e => !string.IsNullOrWhiteSpace(e)))
-                emails.Add(email.Trim().ToLowerInvariant());
+            _logger.LogInformation("🔓 Super admin: todas unidades");
+        }
+        else if (user.TenantId.HasValue)
+        {
+            query = _db.Units
+                .AsNoTracking()
+                .Where(u => u.ClinicId == user.TenantId.Value);
+
+            _logger.LogInformation(
+                "🔒 Usuário comum: tenant {TenantId}",
+                user.TenantId.Value);
+        }
+        else
+        {
+            _logger.LogWarning("⚠️ Usuário sem tenant");
+            return [];
         }
 
-        return emails;
+        var units = await query
+            .Select(u => new UnitSelectorOptionDto
+            {
+                Id = u.Id,
+                ClinicId = u.ClinicId,
+                Name = u.Name,
+                IsDefault = false
+            })
+            .ToListAsync();
+
+        if (units.Count > 0)
+            units[0].IsDefault = true;
+
+        return units;
     }
-            Email = request.Email,
-            SelectedUnit = selectedUnit,
-            AvailableUnits = [.. DefaultUnits]
-        };
+
+    private async Task HandleFailedLoginAsync(User user)
+    {
+        user.FailedLoginAttempts++;
+
+        if (user.FailedLoginAttempts >= 5)
+        {
+            user.LockedUntil = DateTime.UtcNow.AddMinutes(15);
+            _logger.LogWarning("🔒 Bloqueado: {Email}", user.Email);
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
+    private static string GenerateRefreshToken()
+    {
+        var randomNumber = new byte[32];
+        using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+        rng.GetBytes(randomNumber);
+        return Convert.ToBase64String(randomNumber);
     }
 }

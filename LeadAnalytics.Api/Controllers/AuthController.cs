@@ -2,8 +2,6 @@ using System.Security.Claims;
 using LeadAnalytics.Api.DTOs.Auth;
 using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Authorization;
-using LeadAnalytics.Api.DTOs.Auth;
-using LeadAnalytics.Api.Service;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LeadAnalytics.Api.Controllers;
@@ -14,14 +12,6 @@ public class AuthController(AuthService authService, UnitService unitService) : 
 {
     private readonly AuthService _authService = authService;
     private readonly UnitService _unitService = unitService;
-
-    [HttpGet("unit-options")]
-    [ProducesResponseType(typeof(IEnumerable<UnitSelectorOptionDto>), StatusCodes.Status200OK)]
-    public IActionResult GetUnitOptions()
-    {
-        var options = _authService.GetUnitOptions();
-        return Ok(options);
-    }
 
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponseDto), StatusCodes.Status200OK)]
@@ -40,7 +30,10 @@ public class AuthController(AuthService authService, UnitService unitService) : 
         // Garante que a unidade padrão (Araguaína/8020) exista na base.
         await _unitService.GetOrCreateAsync(8020);
 
-        var response = _authService.Login(request);
+        var response = await _authService.LoginAsync(request);
+        if (response == null)
+            return BadRequest(new { message = "Login inválido." });
+
         return Ok(response);
     }
 

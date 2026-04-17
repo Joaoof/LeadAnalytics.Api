@@ -1,7 +1,6 @@
 using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.DTOs.User;
 using LeadAnalytics.Api.Models;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace LeadAnalytics.Api.Service;
@@ -9,8 +8,6 @@ namespace LeadAnalytics.Api.Service;
 public class UserService(AppDbContext db)
 {
 	private readonly AppDbContext _db = db;
-	private readonly PasswordHasher<User> _passwordHasher = new();
-
 	public async Task<List<UserResponseDto>> GetAllAsync()
 	{
 		return await _db.Users
@@ -39,16 +36,15 @@ public class UserService(AppDbContext db)
 		if (emailExists)
 			return null;
 
-		var user = new User
-		{
-			Name = dto.Name.Trim(),
-			Email = email,
-			Role = string.IsNullOrWhiteSpace(dto.Role) ? "user" : dto.Role.Trim().ToLowerInvariant()
-		};
+        var user = new User
+        {
+            Name = dto.Name.Trim(),
+            Email = email,
+            Role = string.IsNullOrWhiteSpace(dto.Role) ? "user" : dto.Role.Trim().ToLowerInvariant(),
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password)
+        };
 
-		user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
-
-		_db.Users.Add(user);
+        _db.Users.Add(user);
 		await _db.SaveChangesAsync();
 
 		return ToResponseDto(user);
@@ -82,7 +78,7 @@ public class UserService(AppDbContext db)
 			user.Role = dto.Role.Trim().ToLowerInvariant();
 
 		if (!string.IsNullOrWhiteSpace(dto.Password))
-			user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
+			user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
 
 		await _db.SaveChangesAsync();
 

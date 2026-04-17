@@ -1,55 +1,98 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using LeadAnalytics.Api.DTOs.Auth;
+using LeadAnalytics.Api.Models;
 using Microsoft.IdentityModel.Tokens;
 
 namespace LeadAnalytics.Api.Service;
 
-public class JwtTokenService(IConfiguration configuration)
+public class JwtTokenService(IConfiguration config, ILogger<JwtTokenService> logger)
 {
-    private readonly IConfiguration _configuration = configuration;
+    private readonly IConfiguration _config = config;
+    private readonly ILogger<JwtTokenService> _logger = logger;
 
-    public (string Token, DateTime ExpiresAtUtc) GenerateToken(
-        LoginRequestDto request,
-        string role,
-        IEnumerable<UnitSelectorOptionDto> units)
+    /// <summary>
+    /// Gerar JWT access token
+    /// </summary>
+    public (string token, DateTime expiresAtUtc) GenerateToken(
+        User user,
+        List<UnitSelectorOptionDto> availableUnits)
     {
-        var jwtSection = _configuration.GetSection("Jwt");
-        var issuer = jwtSection["Issuer"] ?? "LeadAnalytics.Api";
-        var audience = jwtSection["Audience"] ?? "LeadAnalytics.Frontend";
-        var key = jwtSection["Key"] ?? throw new InvalidOperationException("Jwt:Key não configurada.");
-        var expirationMinutes = int.TryParse(jwtSection["ExpirationMinutes"], out var parsed)
-            ? parsed
-            : 480;
+        // ─────────────────────────────────────────────
+        // CONFIG
+        // ─────────────────────────────────────────────
+        var jwtSecret = _config["Jwt:Secret"];
+        var issuer = _config["Jwt:Issuer"] ?? "LeadAnalyticsApi";
+        var audience = _config["Jwt:Audience"] ?? "LeadAnalyticsClient";
 
-        if (key.Length < 32)
-            throw new InvalidOperationException("Jwt:Key deve ter pelo menos 32 caracteres.");
+        if (string.IsNullOrWhiteSpace(jwtSecret))
+            throw new InvalidOperationException("JWT Secret não configurado");
 
-        var expiresAtUtc = DateTime.UtcNow.AddMinutes(expirationMinutes);
+        byte[] keyBytes;
 
-        var claims = new List<Claim>
+        try
         {
-            new(JwtRegisteredClaimNames.Sub, request.Email ?? request.Name ?? "usuario"),
-            new(JwtRegisteredClaimNames.Email, request.Email ?? string.Empty),
-            new(ClaimTypes.Name, request.Name ?? "Usuário Cloudia"),
-            new(ClaimTypes.Role, role)
-        };
+            keyBytes = Convert.FromBase64String(jwtSecret);
+        }
+        catch
+        {
+            throw new InvalidOperationException("JWT Secret deve estar em Base64 válido");
+        }
 
-        claims.AddRange(units.Select(unit => new Claim("clinic_id", unit.ClinicId.ToString())));
-        claims.AddRange(units.Select(unit => new Claim("unit_id", unit.Id.ToString())));
+        if (keyBytes.Length < 16)
+            throw new InvalidOperationException("JWT Secret deve ter no mínimo 128 bits (16 bytes)");
+
+        var securityKey = new SymmetricSecurityKey(keyBytes);
 
         var credentials = new SigningCredentials(
-            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)),
-            SecurityAlgorithms.HmacSha256);
+            securityKey,
+            SecurityAlgorithms.HmacSha256
+        );
+
+        // ─────────────────────────────────────────────
+        // CLAIMS
+        // ─────────────────────────────────────────────
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Email, user.Email),
+            new(ClaimTypes.Name, user.Name),
+            new(ClaimTypes.Role, user.Role)
+        };
+
+        if (user.TenantId.HasValue)
+        {
+            claims.Add(new Claim("tenant_id", user.TenantId.Value.ToString()));
+        }
+
+        var unitsJson = System.Text.Json.JsonSerializer.Serialize(
+            availableUnits.Select(u => new { u.Id, u.ClinicId, u.Name })
+        );
+
+        claims.Add(new Claim("available_units", unitsJson));
+
+        // ─────────────────────────────────────────────
+        // TOKEN
+        // ─────────────────────────────────────────────
+        var expiresAt = DateTime.UtcNow.AddHours(1);
 
         var token = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: expiresAtUtc,
-            signingCredentials: credentials);
+            expires: expiresAt,
+            signingCredentials: credentials
+        );
 
-        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAtUtc);
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+        _logger.LogInformation(
+            "✅ Token gerado: User={UserId}, Role={Role}, Expires={ExpiresAt}",
+            user.Id,
+            user.Role,
+            expiresAt
+        );
+
+        return (tokenString, expiresAt);
     }
 }

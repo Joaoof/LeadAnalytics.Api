@@ -1,4 +1,3 @@
-using System.Text;
 using LeadAnalytics.Api.Data;
 using LeadAnalytics.Api.Options;
 using LeadAnalytics.Api.Service;
@@ -22,9 +21,13 @@ builder.Services.AddControllers();
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var jwtKey = jwtSection["Key"] ?? "troque-esta-chave-jwt-com-no-minimo-32-caracteres";
-var jwtIssuer = jwtSection["Issuer"] ?? "LeadAnalytics.Api";
-var jwtAudience = jwtSection["Audience"] ?? "LeadAnalytics.Frontend";
+
+var jwtSecret = jwtSection["Secret"]
+    ?? throw new InvalidOperationException("Jwt:Secret não foi configurado.");
+
+var keyBytes = Convert.FromBase64String(jwtSecret);
+
+builder.Services.AddSwaggerGen();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -36,25 +39,22 @@ builder.Services
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidIssuer = jwtSection["Issuer"] ?? "LeadAnalytics.Api",
+            ValidAudience = jwtSection["Audience"] ?? "LeadAnalytics.Frontend",
+            IssuerSigningKey = new SymmetricSecurityKey(keyBytes),
             ClockSkew = TimeSpan.Zero
         };
     });
 
 builder.Services.AddAuthorization();
 
-// 🔥 Swagger correto
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
 
 builder.Services.AddScoped<LeadService>();
 builder.Services.AddScoped<UnitService>();
 builder.Services.AddScoped<AttendantService>();
 builder.Services.AddScoped<IRelatorioService, RelatorioService>();
 builder.Services.AddSingleton<IPdfRelatorioService, PdfRelatorioService>();
-
 builder.Services.AddHttpClient<MetricsService>();
 builder.Services.AddScoped<MetricsService>();
 builder.Services.AddScoped<SyncN8N>();
@@ -64,21 +64,14 @@ builder.Services.AddScoped<MetaWebhookService>();
 builder.Services.AddScoped<ConfigurationService>();
 builder.Services.AddScoped<LeadAnalyticsService>();
 builder.Services.AddScoped<JwtTokenService>();
-builder.Services.AddScoped<AuthService>();
-builder.Services.AddScoped<AuthService>();
+builder.Services.AddScoped<AuthService>();  // ← apenas uma vez
 builder.Services.AddScoped<UserService>();
 
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
-    {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
-
 
 var app = builder.Build();
 
@@ -92,9 +85,9 @@ app.UseSwaggerUI(c =>
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
+app.UseCors("AllowAll");        // ← antes de Authentication
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseCors("AllowAll");
 
 app.MapControllers();
 
