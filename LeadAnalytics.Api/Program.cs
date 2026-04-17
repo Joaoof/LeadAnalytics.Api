@@ -34,6 +34,7 @@ builder.Services.AddScoped<LeadAttributionService>();
 builder.Services.AddScoped<MetaWebhookService>(); 
 builder.Services.AddScoped<ConfigurationService>();
 builder.Services.AddScoped<LeadAnalyticsService>();
+builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();
 
 builder.Services.AddCors(options =>
