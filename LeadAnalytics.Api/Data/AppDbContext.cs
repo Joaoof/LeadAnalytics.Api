@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<OriginEvent> OriginEvents { get; set; }
     public DbSet<LeadAttribution> LeadAttributions { get; set; }
     public DbSet<AppConfiguration> AppConfigurations { get; set; }
+    public DbSet<User> Users { get; set; }
 
     public DbSet<WebhookEvent> WebhookEvents { get; set; }
 
@@ -113,5 +114,31 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                   .WithMany(l => l.Payments)
                   .HasForeignKey(e => e.LeadId);
         });
+
+          // ─── User ────────────────────────────────────────────────
+          modelBuilder.Entity<User>(entity =>
+          {
+            entity.ToTable("users");
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(120)
+                .IsRequired();
+
+            entity.Property(e => e.Email)
+                .HasMaxLength(180)
+                .IsRequired();
+
+            entity.Property(e => e.PasswordHash)
+                .IsRequired();
+
+            entity.Property(e => e.Role)
+                .HasMaxLength(30)
+                .HasDefaultValue("user")
+                .IsRequired();
+
+            entity.HasIndex(e => e.Email)
+                .IsUnique();
+          });
     }
 }
