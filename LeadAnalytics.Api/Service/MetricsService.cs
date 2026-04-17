@@ -19,7 +19,7 @@ public class MetricsService(
         string attendantType = "HUMAN")
     {
         var token = _config["Cloudia:Token"];
-        var url = $"https://human-metrics.cloudiabot.com/api/clinics/{clinicId}/dashboard/real-time" +
+        var url = $"https://human-metrics.cloudiabotom/api/clinics/{clinicId}/dashboard/real-time" +
                   $"?attendantType={attendantType}&metricType=BUSINESS_PERIOD";
 
         _httpClient.DefaultRequestHeaders.Clear();
